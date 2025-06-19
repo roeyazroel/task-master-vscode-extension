@@ -1,9 +1,9 @@
 {
   "name": "task-master-vscode-extension",
-  "displayName": "Task Master",
+  "displayName": "Task Master(AI) Extension",
   "description": "VS Code extension for Task Master AI - visualize and manage your AI-assisted tasks",
-  "version": "0.1.0",
-  "publisher": "roeyazroel",
+  "version": "0.1.1",
+  "publisher": "razroel",
   "repository": {
     "type": "git",
     "url": "https://github.com/roeyazroel/task-master-vscode-extension.git"

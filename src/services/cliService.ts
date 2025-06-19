@@ -376,6 +376,62 @@ export class CLIService extends EventEmitter {
   }
 
   /**
+   * Get the CLI version and compare against minimum requirement
+   * @returns Object with version info and validation result
+   */
+  public async checkCLIVersion(): Promise<{
+    isValid: boolean;
+    currentVersion?: string;
+    minRequiredVersion: string;
+    error?: string;
+  }> {
+    const minRequiredVersion = "17";
+
+    try {
+      const versionOutput = await this.executeCommand("--version", {
+        timeout: 5000,
+        format: "text",
+      });
+
+      // Parse version from output (expecting format like "task-master-ai/0.17.1" or "0.17.1")
+      // For Task Master CLI, the format is 0.X.Y where X is the actual version number
+      const versionMatch = versionOutput.match(/(\d+)\.(\d+)\.(\d+)/);
+
+      if (!versionMatch) {
+        return {
+          isValid: false,
+          minRequiredVersion,
+          error: "Could not parse CLI version from output",
+        };
+      }
+
+      const currentVersion = versionMatch[0];
+      // For Task Master CLI versioning (0.X.Y), the meaningful version is the second number (X)
+      const actualVersion = parseInt(versionMatch[2], 10);
+      const minRequired = parseInt(minRequiredVersion, 10);
+
+      const isValid = actualVersion >= minRequired;
+
+      return {
+        isValid,
+        currentVersion,
+        minRequiredVersion,
+        error: isValid
+          ? undefined
+          : `CLI version ${currentVersion} is below minimum required version ${minRequiredVersion}`,
+      };
+    } catch (error) {
+      return {
+        isValid: false,
+        minRequiredVersion,
+        error: `Failed to check CLI version: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+      };
+    }
+  }
+
+  /**
    * Get the time of the last successful refresh
    */
   public getLastRefreshTime(): number {

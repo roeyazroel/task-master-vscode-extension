@@ -464,11 +464,56 @@
         ],
         "priority": "high",
         "subtasks": []
+      },
+      {
+        "id": 19,
+        "title": "Enforce Minimum CLI Version Requirement",
+        "description": "Prevent the extension from running if the Task Master AI CLI version is below 17.",
+        "details": "To implement this feature, modify the initialization routine of the extension to include a version check for the Task Master AI CLI. Use the CLI's version command to retrieve the current version number. Compare this version against the minimum required version (17). If the current version is below 17, display an error message to the user and prevent further execution of the extension. Ensure that the error message is clear and provides instructions on how to update the CLI to the required version. Consider edge cases such as the CLI not being installed or the version command failing, and handle these scenarios gracefully by providing appropriate feedback to the user.",
+        "testStrategy": "1. Simulate environments with different CLI versions and verify that the extension runs only when the version is 17 or higher.\n2. Test the error message display when the CLI version is below 17, ensuring it is clear and informative.\n3. Verify that the extension does not execute any further operations when the version check fails.\n4. Test scenarios where the CLI is not installed or the version command fails, ensuring appropriate error handling and user feedback.",
+        "status": "done",
+        "dependencies": [
+          15
+        ],
+        "priority": "high",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement CLI Version Check in Extension Initialization",
+            "description": "Modify the extension's initialization routine to include a check for the Task Master AI CLI version.",
+            "dependencies": [],
+            "details": "Update the extension's startup sequence to execute a version check command for the Task Master AI CLI. Ensure that the command retrieves the current CLI version accurately.",
+            "status": "done",
+            "testStrategy": "Unit test the initialization routine to confirm that the version check command executes correctly and retrieves the expected version number."
+          },
+          {
+            "id": 2,
+            "title": "Compare Retrieved CLI Version Against Minimum Requirement",
+            "description": "Develop logic to compare the retrieved CLI version with the minimum required version (17).",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement a function that parses the retrieved CLI version and compares it to the minimum required version. If the current version is below 17, set a flag to prevent further execution of the extension.",
+            "status": "done",
+            "testStrategy": "Create test cases with various CLI versions to verify that the comparison logic correctly identifies versions below and above the minimum requirement."
+          },
+          {
+            "id": 3,
+            "title": "Handle Error Scenarios and Provide User Feedback",
+            "description": "Ensure the extension handles scenarios where the CLI is not installed or the version command fails, and provide clear error messages to the user.",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement error handling to catch cases where the CLI is missing or the version command fails. Display an error message informing the user of the issue and provide instructions on how to install or update the CLI to meet the minimum version requirement.\n<info added on 2025-06-19T17:20:27.316Z>\nIntegrated initialization guards and unified the command-registration logic so that each CLI command is registered only once. This eliminates the “taskMaster.selectTag already exists” conflict observed during version validation and prevents any future duplicate-registration errors.\n</info added on 2025-06-19T17:20:27.316Z>",
+            "status": "done",
+            "testStrategy": "Simulate scenarios where the CLI is absent or the version command fails, and verify that the extension displays appropriate error messages and prevents further execution."
+          }
+        ]
       }
     ],
     "metadata": {
       "created": "2025-06-17T14:01:27.651Z",
-      "updated": "2025-06-19T15:16:52.374Z",
+      "updated": "2025-06-19T17:14:09.221Z",
       "description": "Tasks for master context"
     }
   }

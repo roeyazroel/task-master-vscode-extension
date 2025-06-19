@@ -78,7 +78,7 @@ export class TaskTreeItem extends vscode.TreeItem {
         let dependentSubtask = null;
         for (const task of this.allTasks) {
           dependentSubtask = task.subtasks?.find(
-            (subtask) => subtask.id === id.toString()
+            (subtask) => subtask.id === id
           );
           if (dependentSubtask) {
             break;

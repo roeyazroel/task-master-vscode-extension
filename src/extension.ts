@@ -54,13 +54,94 @@ export function activate(context: vscode.ExtensionContext) {
   securityService = SecurityService.getInstance();
 
   // Check workspace trust and show warning if needed
-  securityService.showUntrustedWorkspaceWarning().then((shouldContinue) => {
-    if (!shouldContinue) {
-      console.log("User chose not to continue with untrusted workspace");
-      return;
-    }
-  });
+  securityService
+    .showUntrustedWorkspaceWarning()
+    .then(async (shouldContinue) => {
+      if (!shouldContinue) {
+        console.log("User chose not to continue with untrusted workspace");
+        return;
+      }
 
+      // Check CLI version before proceeding with initialization
+      await validateCLIVersion(context);
+    });
+
+  // The rest of the initialization will be handled after CLI version validation
+}
+
+/**
+ * Validate that the Task Master CLI meets minimum version requirements
+ */
+async function validateCLIVersion(
+  context: vscode.ExtensionContext
+): Promise<void> {
+  try {
+    // Initialize Task Manager Service to access CLI service
+    taskManagerService = new TaskManagerService();
+
+    // Check CLI version
+    const versionCheck = await taskManagerService.checkCLIVersion();
+
+    if (!versionCheck.isValid) {
+      const errorMessage = versionCheck.error || "CLI version check failed";
+      const updateInstructions =
+        "Please update Task Master CLI to version 17 or higher using: npm install -g task-master-ai@latest";
+
+      vscode.window
+        .showErrorMessage(
+          `Task Master CLI Error: ${errorMessage}. ${updateInstructions}`,
+          "Open Documentation"
+        )
+        .then((selection) => {
+          if (selection === "Open Documentation") {
+            vscode.env.openExternal(
+              vscode.Uri.parse(
+                "https://github.com/eyaltoledano/claude-task-master.git"
+              )
+            );
+          }
+        });
+
+      console.error(`CLI version validation failed: ${errorMessage}`);
+      return; // Stop initialization
+    }
+
+    console.log(
+      `CLI version validation passed: ${versionCheck.currentVersion}`
+    );
+
+    // Continue with normal initialization after version check passes
+    await initializeExtensionServices(context);
+  } catch (error) {
+    const errorMessage = `Failed to validate CLI version: ${
+      error instanceof Error ? error.message : "Unknown error"
+    }`;
+
+    vscode.window
+      .showErrorMessage(
+        `Task Master CLI Error: ${errorMessage}. Please ensure Task Master CLI is installed and accessible.`,
+        "Install CLI"
+      )
+      .then((selection) => {
+        if (selection === "Install CLI") {
+          vscode.env.openExternal(
+            vscode.Uri.parse(
+              "https://github.com/eyaltoledano/claude-task-master.git"
+            )
+          );
+        }
+      });
+
+    console.error(errorMessage);
+  }
+}
+
+/**
+ * Initialize extension services after CLI validation passes
+ */
+async function initializeExtensionServices(
+  context: vscode.ExtensionContext
+): Promise<void> {
   // Set context to indicate Task Master is enabled
   vscode.commands.executeCommand("setContext", "taskMaster.enabled", true);
 
@@ -76,9 +157,6 @@ export function activate(context: vscode.ExtensionContext) {
     "taskMaster.cliAllowed",
     securityContext.allowCliExecution
   );
-
-  // Initialize Task Manager Service
-  taskManagerService = new TaskManagerService();
 
   // Initialize Status Bar Service
   statusBarService = new StatusBarService(taskManagerService, context);
@@ -96,6 +174,22 @@ export function activate(context: vscode.ExtensionContext) {
     canSelectMany: false,
   });
 
+  // Register all commands
+  registerCommands(context, treeView);
+
+  // Set up event handlers
+  setupEventHandlers(context, treeView);
+
+  console.log("Task Master extension initialization completed successfully");
+}
+
+/**
+ * Register all extension commands
+ */
+function registerCommands(
+  context: vscode.ExtensionContext,
+  treeView: vscode.TreeView<any>
+): void {
   // Register commands with actual functionality
   const disposables = [
     vscode.commands.registerCommand("taskMaster.refreshTasks", async () => {
@@ -524,17 +618,13 @@ export function activate(context: vscode.ExtensionContext) {
   });
   context.subscriptions.push(trustChangeListener);
 
-  // Setup event handlers
-  setupEventHandlers();
+  // Add status bar to subscriptions for proper cleanup
+  context.subscriptions.push(statusBarService);
 
   // Initialize Task Manager Service and start polling
   taskManagerService.initialize().then(() => {
     console.log("Task Manager Service initialized");
   });
-
-  // Add to context subscriptions for proper cleanup
-  context.subscriptions.push(treeView);
-  context.subscriptions.push(statusBarService);
 
   console.log("Task Master extension activated successfully");
 }
@@ -542,7 +632,10 @@ export function activate(context: vscode.ExtensionContext) {
 /**
  * Setup event handlers for cross-service communication
  */
-function setupEventHandlers() {
+function setupEventHandlers(
+  context: vscode.ExtensionContext,
+  treeView: vscode.TreeView<any>
+) {
   // Handle task updates
   taskManagerService.on("tasksUpdated", async (tasks) => {
     taskTreeProvider.updateTasks(tasks);

@@ -175,6 +175,18 @@ export class TaskManagerService extends EventEmitter {
   }
 
   /**
+   * Check CLI version and validate against minimum requirements
+   */
+  public async checkCLIVersion(): Promise<{
+    isValid: boolean;
+    currentVersion?: string;
+    minRequiredVersion: string;
+    error?: string;
+  }> {
+    return await this.cliService.checkCLIVersion();
+  }
+
+  /**
    * Refresh tasks manually
    */
   public async refreshTasks(): Promise<TaskMasterResponse | null> {
