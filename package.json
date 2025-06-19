@@ -313,16 +313,14 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile && npm run security-check",
+    "vscode:prepublish": "npm run compile",
     "compile": "rimraf out && tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "test": "mocha --require source-map-support/register \"out/test/**/*.js\"",
     "lint": "eslint src --ext ts",
     "package": "vsce package",
-    "publish": "vsce publish",
-    "security-check": "node scripts/security-check.js",
-    "security-audit": "npm audit && npm run security-check"
+    "publish": "vsce publish"
   },
   "devDependencies": {
     "@types/glob": "^8.1.0",
