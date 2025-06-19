@@ -6,7 +6,7 @@
   "publisher": "roeyazroel",
   "repository": {
     "type": "git",
-    "url": "git@github.com:roeyazroel/task-master-vscode-extension.git"
+    "url": "https://github.com/roeyazroel/task-master-vscode-extension.git"
   },
   "bugs": {
     "url": "https://github.com/roeyazroel/task-master-vscode-extension/issues"
