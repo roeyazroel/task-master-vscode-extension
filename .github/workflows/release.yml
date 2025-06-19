@@ -82,9 +82,17 @@ jobs:
       #   env:
       #     VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
-      - name: Upload release artifact
-        uses: actions/upload-artifact@v4
+      # - name: Upload release artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: extension-package
+      #     path: "*.vsix"
+      #     retention-days: 90
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: extension-package
-          path: "*.vsix"
-          retention-days: 90
+          files: "*.vsix"
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
