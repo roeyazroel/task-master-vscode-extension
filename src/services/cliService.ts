@@ -1,0 +1,455 @@
+import { spawn } from "child_process";
+import { EventEmitter } from "events";
+import * as fs from "fs";
+import * as path from "path";
+import * as vscode from "vscode";
+import {
+  CLIExecutionOptions,
+  Task,
+  TaskMasterConfig,
+  TaskMasterResponse,
+  TasksFileStructure,
+  TaskStats,
+} from "../types";
+
+/**
+ * Service for interacting with Task Master CLI
+ * Handles command execution, output parsing, and polling
+ * Uses hybrid approach: CLI for operations, direct JSON file reading for data retrieval
+ */
+export class CLIService extends EventEmitter {
+  private config: TaskMasterConfig;
+  private lastRefreshTime: number = 0;
+  private isExecuting: boolean = false;
+
+  constructor(config: TaskMasterConfig) {
+    super();
+    this.config = config;
+  }
+
+  /**
+   * Update configuration
+   */
+  public updateConfig(config: TaskMasterConfig): void {
+    this.config = config;
+  }
+
+  /**
+   * Execute task-master list command and return parsed results
+   * Now reads JSON file directly instead of parsing CLI output
+   */
+  public async refreshTasks(
+    options: CLIExecutionOptions = {}
+  ): Promise<TaskMasterResponse | string | null> {
+    if (this.isExecuting) {
+      console.log("CLI execution already in progress, skipping...");
+      return null;
+    }
+
+    try {
+      this.isExecuting = true;
+      this.emit("refreshStarted");
+
+      // For list operations, read the JSON file directly
+      if (options.readFromFile !== false) {
+        const fileResult = await this.readTasksFromFile(options);
+        if (fileResult) {
+          this.lastRefreshTime = Date.now();
+          this.emit("refreshCompleted", fileResult);
+          return fileResult;
+        }
+      }
+
+      // Fallback to CLI execution for operations that modify data
+      const result = await this.executeCommand("list", options);
+      this.lastRefreshTime = Date.now();
+      this.emit("refreshCompleted", result);
+      // Only return TaskMasterResponse, ignore string output for list
+      if (typeof result === "string") {
+        return null;
+      }
+      return result;
+    } catch (error) {
+      console.error("Error refreshing tasks:", error);
+      this.emit("refreshError", error);
+      return null;
+    } finally {
+      this.isExecuting = false;
+    }
+  }
+
+  /**
+   * Read tasks directly from JSON file
+   * This avoids the issue of parsing formatted CLI output
+   */
+  private async readTasksFromFile(
+    options: CLIExecutionOptions = {}
+  ): Promise<TaskMasterResponse | null> {
+    try {
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!workspaceRoot) {
+        console.log("No workspace root found, cannot read tasks file");
+        return null;
+      }
+
+      const tasksFilePath = path.join(
+        workspaceRoot,
+        ".taskmaster",
+        "tasks",
+        "tasks.json"
+      );
+
+      if (!fs.existsSync(tasksFilePath)) {
+        console.log("Tasks file does not exist:", tasksFilePath);
+        return null;
+      }
+
+      const tasksContent = fs.readFileSync(tasksFilePath, "utf8");
+      const tasksData = JSON.parse(tasksContent) as TasksFileStructure;
+
+      // Convert tasks file structure to expected response format
+      const currentTag = this.getCurrentTag(tasksData);
+      const allTasks = this.getAllTasksFromTags(tasksData);
+
+      // Apply filtering if status option is provided
+      let filteredTasks = allTasks;
+      if (options.status) {
+        filteredTasks = allTasks.filter((task) => {
+          if (task.status !== options.status) {
+            return false;
+          }
+
+          // Also filter subtasks if withSubtasks is true
+          if (options.withSubtasks && task.subtasks) {
+            task.subtasks = task.subtasks.filter(
+              (subtask) => subtask.status === options.status
+            );
+          }
+
+          return true;
+        });
+      }
+
+      // Calculate stats
+      const stats = this.calculateTaskStats(filteredTasks);
+
+      // Build response structure
+      const response: TaskMasterResponse = {
+        data: {
+          tasks: filteredTasks,
+          filter: options.status || "all",
+          stats: stats,
+        },
+        version: {
+          version: tasksData.metadata.version,
+          name: "Task Master",
+        },
+        tag: {
+          currentTag: currentTag,
+          availableTags: Object.keys(tasksData.tags),
+        },
+      };
+
+      console.log("Successfully read tasks from file:", tasksFilePath);
+      return response;
+    } catch (error) {
+      console.error("Error reading tasks from file:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Get the current tag from the tasks file structure
+   */
+  private getCurrentTag(tasksData: TasksFileStructure): string {
+    for (const tagName in tasksData.tags) {
+      if (tasksData.tags[tagName].current) {
+        return tagName;
+      }
+    }
+    return Object.keys(tasksData.tags)[0] || "master";
+  }
+
+  /**
+   * Get all tasks from all tags (or just current tag if needed)
+   */
+  private getAllTasksFromTags(tasksData: TasksFileStructure): Task[] {
+    const currentTag = this.getCurrentTag(tasksData);
+    return tasksData.tags[currentTag]?.tasks || [];
+  }
+
+  /**
+   * Calculate task statistics
+   */
+  private calculateTaskStats(tasks: Task[]): TaskStats {
+    const stats = {
+      total: tasks.length,
+      completed: 0,
+      inProgress: 0,
+      pending: 0,
+      blocked: 0,
+      deferred: 0,
+      cancelled: 0,
+      review: 0,
+      completionPercentage: 0,
+      subtasks: {
+        total: 0,
+        completed: 0,
+        inProgress: 0,
+        pending: 0,
+        blocked: 0,
+        deferred: 0,
+        cancelled: 0,
+        completionPercentage: 0,
+      },
+    };
+
+    tasks.forEach((task) => {
+      switch (task.status) {
+        case "done":
+          stats.completed++;
+          break;
+        case "in-progress":
+          stats.inProgress++;
+          break;
+        case "pending":
+          stats.pending++;
+          break;
+        case "blocked":
+          stats.blocked++;
+          break;
+        case "deferred":
+          stats.deferred++;
+          break;
+        case "cancelled":
+          stats.cancelled++;
+          break;
+        case "review":
+          stats.review++;
+          break;
+      }
+
+      // Count subtasks
+      if (task.subtasks) {
+        task.subtasks.forEach((subtask) => {
+          stats.subtasks.total++;
+          switch (subtask.status) {
+            case "done":
+              stats.subtasks.completed++;
+              break;
+            case "in-progress":
+              stats.subtasks.inProgress++;
+              break;
+            case "pending":
+              stats.subtasks.pending++;
+              break;
+            case "blocked":
+              stats.subtasks.blocked++;
+              break;
+            case "deferred":
+              stats.subtasks.deferred++;
+              break;
+            case "cancelled":
+              stats.subtasks.cancelled++;
+              break;
+          }
+        });
+      }
+    });
+
+    // Calculate completion percentages
+    if (stats.total > 0) {
+      stats.completionPercentage = Math.round(
+        (stats.completed / stats.total) * 100
+      );
+    }
+    if (stats.subtasks.total > 0) {
+      stats.subtasks.completionPercentage = Math.round(
+        (stats.subtasks.completed / stats.subtasks.total) * 100
+      );
+    }
+
+    return stats;
+  }
+
+  /**
+   * Execute a specific Task Master CLI command
+   * For data retrieval operations, consider using readTasksFromFile instead
+   */
+  public async executeCommand(
+    command: string,
+    options: CLIExecutionOptions = {}
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const args = this.buildCommandArgs(command, options);
+      const childProcess = spawn(this.config.cliPath, args, {
+        cwd: vscode.workspace.rootPath || process.cwd(),
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+
+      let stdout = "";
+      let stderr = "";
+      const timeout = options.timeout || 300000; // 5 minute default timeout
+
+      // Set up timeout
+      const timeoutHandle = setTimeout(() => {
+        childProcess.kill("SIGTERM");
+        reject(new Error(`Command timed out after ${timeout}ms`));
+      }, timeout);
+
+      // Handle stdout data streaming
+      childProcess.stdout?.on("data", (data: Buffer) => {
+        stdout += data.toString();
+        this.emit("outputReceived", data.toString());
+      });
+
+      // Handle stderr
+      childProcess.stderr?.on("data", (data: Buffer) => {
+        stderr += data.toString();
+      });
+
+      // Handle process completion
+      childProcess.on("close", (code: number | null) => {
+        clearTimeout(timeoutHandle);
+
+        if (code === 0) {
+          resolve(stdout);
+        } else {
+          // Include both stderr and stdout in error message for better debugging
+          const errorOutput =
+            stderr.trim() || stdout.trim() || "No error output";
+          reject(
+            new Error(`CLI command failed with code ${code}: ${errorOutput}`)
+          );
+        }
+      });
+
+      // Handle process errors
+      childProcess.on("error", (error: Error) => {
+        clearTimeout(timeoutHandle);
+        reject(new Error(`Failed to spawn CLI process: ${error.message}`));
+      });
+    });
+  }
+
+  /**
+   * Build command line arguments based on options
+   */
+  private buildCommandArgs(
+    command: string,
+    options: CLIExecutionOptions
+  ): string[] {
+    const args = [command];
+
+    if (options.withSubtasks) {
+      args.push("--with-subtasks");
+    }
+
+    if (options.status) {
+      args.push("--status", options.status);
+    }
+
+    // Add extra arguments if provided
+    if (options.extraArgs && options.extraArgs.length > 0) {
+      args.push(...options.extraArgs);
+    }
+
+    // Note: task-master CLI outputs JSON by default for list commands
+
+    return args;
+  }
+
+  /**
+   * Check if CLI is available and accessible
+   */
+  public async checkCLIAvailability(): Promise<boolean> {
+    try {
+      await this.executeCommand("--version", {
+        timeout: 5000,
+        format: "text", // Version output is typically text, not JSON
+      });
+      return true;
+    } catch (error) {
+      console.error("CLI not available:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Get the time of the last successful refresh
+   */
+  public getLastRefreshTime(): number {
+    return this.lastRefreshTime;
+  }
+
+  /**
+   * Check if currently executing a command
+   */
+  public isRefreshing(): boolean {
+    return this.isExecuting;
+  }
+
+  /**
+   * Clean up resources
+   */
+  public dispose(): void {
+    this.removeAllListeners();
+  }
+
+  /**
+   * Get next task data directly from CLI (bypasses file reading)
+   * This is specifically for the "next" command which needs CLI logic
+   */
+  public async getNextTaskFromCLI(): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const args = ["next"];
+      const childProcess = spawn(this.config.cliPath, args, {
+        cwd: vscode.workspace.rootPath || process.cwd(),
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+
+      let stdout = "";
+      let stderr = "";
+      const timeout = 30000; // 30 second timeout for next command
+
+      // Set up timeout
+      const timeoutHandle = setTimeout(() => {
+        childProcess.kill("SIGTERM");
+        reject(new Error(`Next command timed out after ${timeout}ms`));
+      }, timeout);
+
+      // Handle stdout data streaming
+      childProcess.stdout?.on("data", (data: Buffer) => {
+        stdout += data.toString();
+        this.emit("outputReceived", data.toString());
+      });
+
+      // Handle stderr
+      childProcess.stderr?.on("data", (data: Buffer) => {
+        stderr += data.toString();
+      });
+
+      // Handle process completion
+      childProcess.on("close", (code: number | null) => {
+        clearTimeout(timeoutHandle);
+
+        if (code === 0) {
+          resolve(stdout);
+        } else {
+          // Include both stderr and stdout in error message for better debugging
+          const errorOutput =
+            stderr.trim() || stdout.trim() || "No error output";
+          reject(
+            new Error(`Next command failed with code ${code}: ${errorOutput}`)
+          );
+        }
+      });
+
+      // Handle process errors
+      childProcess.on("error", (error: Error) => {
+        clearTimeout(timeoutHandle);
+        reject(new Error(`Failed to spawn next CLI process: ${error.message}`));
+      });
+    });
+  }
+}

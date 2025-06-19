@@ -1,0 +1,66 @@
+# Source files
+src/**
+!out/**
+
+# Build artifacts
+*.vsix
+
+# Development files
+.github/**
+.vscode/**
+.eslintrc.json
+tsconfig.json
+*.map
+
+# Task Master specific
+.taskmaster/**
+.tasks/**
+
+# Dependencies and package files
+node_modules/**
+package-lock.json
+
+# Git and version control
+.git/**
+.gitignore
+
+# Security and sensitive files
+*.env*
+*.key
+*.pem
+*.cert
+secrets/**
+
+# Documentation (keep only essential docs)
+SECURITY.md
+README.md
+!LICENSE
+
+# Exclude test files
+**/*.test.*
+**/*.spec.*
+test/**
+tests/**
+
+# Exclude development configs
+.prettierrc*
+.editorconfig
+.nvmrc
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE files
+*.swp
+*.swo
+*~
+.idea/**
+
+# Logs
+*.log
+logs/**
+
+# Temporary files
+tmp/**
+temp/**

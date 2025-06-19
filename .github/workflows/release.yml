@@ -1,0 +1,90 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run security audit before release
+        run: npm audit --audit-level=high
+
+      - name: Run tests
+        run: npm test
+
+      - name: Lint code
+        run: npm run lint
+
+      - name: Compile TypeScript
+        run: npm run compile
+
+      - name: Package extension
+        run: npm run package
+
+      - name: Verify package integrity
+        run: |
+          # Verify the package was created
+          if [ ! -f *.vsix ]; then
+            echo "Error: Package not created"
+            exit 1
+          fi
+
+          # Extract and verify package contents
+          PACKAGE_NAME=$(ls *.vsix)
+          echo "Verifying package: $PACKAGE_NAME"
+
+          # Create temp directory for extraction
+          mkdir -p temp_extract
+          cd temp_extract
+
+          # Extract the package (VSIX is a ZIP file)
+          unzip ../$PACKAGE_NAME
+
+          # Verify required files exist
+          if [ ! -f "extension/package.json" ]; then
+            echo "Error: package.json not found in package"
+            exit 1
+          fi
+
+          if [ ! -f "extension/out/extension.js" ]; then
+            echo "Error: compiled extension.js not found in package"
+            exit 1
+          fi
+
+          # Verify no sensitive files are included
+          if find . -name "*.env*" -o -name "*.key" -o -name "*.pem" | grep -q .; then
+            echo "Error: Sensitive files found in package"
+            exit 1
+          fi
+
+          cd ..
+          rm -rf temp_extract
+
+          echo "Package verification completed successfully"
+
+      - name: Publish to VS Code Marketplace
+        run: npm run publish
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: extension-package
+          path: "*.vsix"
+          retention-days: 90

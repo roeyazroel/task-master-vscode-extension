@@ -1,0 +1,345 @@
+{
+  "name": "task-master-vscode-extension",
+  "displayName": "Task Master",
+  "description": "VS Code extension for Task Master AI - visualize and manage your AI-assisted tasks",
+  "version": "0.1.0",
+  "publisher": "roeyazroel",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:roeyazroel/task-master-vscode-extension.git"
+  },
+  "bugs": {
+    "url": "https://github.com/roeyazroel/task-master-vscode-extension/issues"
+  },
+  "homepage": "https://github.com/roeyazroel/task-master-vscode-extension#readme",
+  "author": "roeyazroel <roeyazroel@gmail.com>",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.91.0",
+    "node": ">=18.0.0"
+  },
+  "categories": [
+    "Other",
+    "Data Science",
+    "Machine Learning"
+  ],
+  "keywords": [
+    "task management",
+    "ai",
+    "productivity",
+    "project management",
+    "tree view"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Task Master requires access to local task files and CLI. Some features may be disabled in untrusted workspaces for security.",
+      "restrictedConfigurations": [
+        "taskMaster.cliPath"
+      ]
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "Task Master requires local file system access and CLI execution."
+    }
+  },
+  "contributes": {
+    "views": {
+      "taskMaster": [
+        {
+          "id": "taskMaster.taskView",
+          "name": "Tasks",
+          "when": "taskMaster.enabled"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "taskMaster",
+          "title": "Task Master",
+          "icon": "$(checklist)"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "taskMaster.refreshTasks",
+        "title": "Task Master: Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "taskMaster.showNextTask",
+        "title": "Task Master: Show Next Task"
+      },
+      {
+        "command": "taskMaster.filterByStatus",
+        "title": "Task Master: Filter by Status"
+      },
+      {
+        "command": "taskMaster.selectTag",
+        "title": "Task Master: Select Tag",
+        "icon": "$(tag)"
+      },
+      {
+        "command": "taskMaster.showTagInfo",
+        "title": "Task Master: Show Tag Info"
+      },
+      {
+        "command": "taskMaster.quickSwitchTag",
+        "title": "Task Master: Quick Switch Tag"
+      },
+      {
+        "command": "taskMaster.showInTerminal",
+        "title": "Task Master: Show in Terminal"
+      },
+      {
+        "command": "taskMaster.markComplete",
+        "title": "Task Master: Mark Complete"
+      },
+      {
+        "command": "taskMaster.openTaskFile",
+        "title": "Task Master: Open Task File"
+      },
+      {
+        "command": "taskMaster.refreshTreeView",
+        "title": "Task Master: Refresh Tree View",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "taskMaster.addTask",
+        "title": "Task Master: Add Task",
+        "icon": "$(add)"
+      },
+      {
+        "command": "taskMaster.deleteTask",
+        "title": "Task Master: Delete Task"
+      },
+      {
+        "command": "taskMaster.addDependency",
+        "title": "Task Master: Add Dependency"
+      },
+      {
+        "command": "taskMaster.removeDependency",
+        "title": "Task Master: Remove Dependency"
+      },
+      {
+        "command": "taskMaster.validateDependencies",
+        "title": "Task Master: Validate Dependencies"
+      },
+      {
+        "command": "taskMaster.fixDependencies",
+        "title": "Task Master: Fix Dependencies"
+      },
+      {
+        "command": "taskMaster.changeStatus",
+        "title": "Task Master: Change Status"
+      },
+      {
+        "command": "taskMaster.refreshStatusBar",
+        "title": "Task Master: Refresh Status Bar"
+      },
+      {
+        "command": "taskMaster.cycleStatusBarView",
+        "title": "Task Master: Cycle Status Bar View"
+      },
+      {
+        "command": "taskMaster.expandTask",
+        "title": "Task Master: Expand Task"
+      },
+      {
+        "command": "taskMaster.expandAllTasks",
+        "title": "Task Master: Expand All Pending Tasks",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "taskMaster.updateTask",
+        "title": "Task Master: Update Task",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "taskMaster.analyzeComplexity",
+        "title": "Task Master: Analyze Complexity",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "taskMaster.showComplexityReport",
+        "title": "Task Master: Show Complexity Report",
+        "icon": "$(graph-line)"
+      },
+      {
+        "command": "taskMaster.updateSubtask",
+        "title": "Task Master: Update Subtask",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "taskMaster.changeSubtaskStatus",
+        "title": "Task Master: Change Subtask Status"
+      },
+      {
+        "command": "taskMaster.removeSubtask",
+        "title": "Task Master: Remove Subtask"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "taskMaster.selectTag",
+          "when": "view == taskMaster.taskView",
+          "group": "navigation"
+        },
+        {
+          "command": "taskMaster.addTask",
+          "when": "view == taskMaster.taskView",
+          "group": "navigation"
+        },
+        {
+          "command": "taskMaster.analyzeComplexity",
+          "when": "view == taskMaster.taskView",
+          "group": "navigation"
+        },
+        {
+          "command": "taskMaster.refreshTasks",
+          "when": "view == taskMaster.taskView",
+          "group": "navigation"
+        },
+        {
+          "command": "taskMaster.expandAllTasks",
+          "when": "view == taskMaster.taskView",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "taskMaster.showInTerminal",
+          "when": "view == taskMaster.taskView && viewItem =~ /^task-/",
+          "group": "actions",
+          "title": "Show in Terminal"
+        },
+        {
+          "command": "taskMaster.markComplete",
+          "when": "view == taskMaster.taskView && viewItem =~ /^task-/ && viewItem != task-done",
+          "group": "actions",
+          "title": "Mark Complete"
+        },
+        {
+          "command": "taskMaster.deleteTask",
+          "when": "view == taskMaster.taskView && viewItem =~ /^task-/",
+          "group": "actions",
+          "title": "Delete Task"
+        },
+        {
+          "command": "taskMaster.addDependency",
+          "when": "view == taskMaster.taskView && viewItem =~ /^task-/",
+          "group": "dependency",
+          "title": "Add Dependency"
+        },
+        {
+          "command": "taskMaster.removeDependency",
+          "when": "view == taskMaster.taskView && viewItem =~ /^task-/",
+          "group": "dependency",
+          "title": "Remove Dependency"
+        },
+        {
+          "command": "taskMaster.validateDependencies",
+          "when": "view == taskMaster.taskView && viewItem =~ /^task-/",
+          "group": "dependency",
+          "title": "Validate Dependencies"
+        },
+        {
+          "command": "taskMaster.fixDependencies",
+          "when": "view == taskMaster.taskView && viewItem =~ /^task-/",
+          "group": "dependency",
+          "title": "Fix Dependencies"
+        },
+        {
+          "command": "taskMaster.changeStatus",
+          "when": "view == taskMaster.taskView && viewItem =~ /^task-/",
+          "group": "actions",
+          "title": "Change Status"
+        },
+        {
+          "command": "taskMaster.updateTask",
+          "when": "view == taskMaster.taskView && viewItem =~ /^task-/",
+          "group": "actions",
+          "title": "Update Task"
+        },
+        {
+          "command": "taskMaster.expandTask",
+          "when": "view == taskMaster.taskView && viewItem =~ /^task-/",
+          "group": "expand",
+          "title": "Expand Task"
+        },
+        {
+          "command": "taskMaster.updateSubtask",
+          "when": "view == taskMaster.taskView && viewItem =~ /^subtask-/",
+          "group": "actions",
+          "title": "Update Subtask"
+        },
+        {
+          "command": "taskMaster.changeSubtaskStatus",
+          "when": "view == taskMaster.taskView && viewItem =~ /^subtask-/",
+          "group": "actions",
+          "title": "Change Status"
+        },
+        {
+          "command": "taskMaster.removeSubtask",
+          "when": "view == taskMaster.taskView && viewItem =~ /^subtask-/",
+          "group": "actions",
+          "title": "Remove Subtask"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Task Master",
+      "properties": {
+        "taskMaster.cliPath": {
+          "type": "string",
+          "default": "task-master",
+          "description": "Path to the Task Master CLI executable. Restricted in untrusted workspaces for security.",
+          "scope": "machine-overridable"
+        },
+        "taskMaster.enableLogging": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable detailed logging for debugging purposes.",
+          "scope": "window"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile && npm run security-check",
+    "compile": "rimraf out && tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "test": "mocha --require source-map-support/register \"out/test/**/*.js\"",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package",
+    "publish": "vsce publish",
+    "security-check": "node scripts/security-check.js",
+    "security-audit": "npm audit && npm run security-check"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.91.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "@vscode/test-cli": "^0.0.9",
+    "@vscode/test-electron": "^2.4.0",
+    "@vscode/vsce": "^2.29.0",
+    "eslint": "^8.57.0",
+    "glob": "^11.0.3",
+    "source-map-support": "^0.5.21",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "semver": "^7.6.0"
+  }
+}

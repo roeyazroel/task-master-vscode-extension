@@ -1,0 +1,475 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Setup Project Repository",
+        "description": "Initialize the project repository with necessary configurations and dependencies.",
+        "details": "1. Initialize a new Git repository.\n2. Set up TypeScript with ES2022 target.\n3. Install necessary dependencies: VS Code API, Task Master CLI, Node.js.\n4. Configure esbuild for bundling.\n5. Set up GitHub Actions for CI/CD.",
+        "testStrategy": "Verify repository setup by checking if all dependencies are installed and the project builds successfully.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Implement CLI Integration Layer",
+        "description": "Develop the integration layer to execute Task Master CLI commands and parse outputs.",
+        "details": "1. Use Node.js ChildProcess.spawn to execute 'task-master list --with-subtasks --json'.\n2. Implement stdout streaming and incremental parsing.\n3. Set up debounce polling with a configurable interval.",
+        "testStrategy": "Mock CLI responses and verify that the integration layer correctly parses and outputs task data.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "Develop Task Tree View",
+        "description": "Create a TreeDataProvider to render tasks and subtasks in a hierarchical view.",
+        "details": "1. Use VS Code's TreeDataProvider API to create a tree view.\n2. Render tasks with ID, title, status, and complexity score.\n3. Implement collapsible dependency branches.",
+        "testStrategy": "Test the tree view with mock data to ensure correct rendering and interactivity.",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Add Interactive Node Commands",
+        "description": "Extend the VS Code extension so users can fully manage and navigate Task-Master tasks directly from the tree view. In addition to opening PRDs and marking tasks complete, users must be able to add and delete tasks (with dependency handling) and quickly navigate to, or display, the next actionable task or any specific task’s details.",
+        "status": "done",
+        "dependencies": [
+          3
+        ],
+        "priority": "medium",
+        "details": "The tree-view context menu should expose the following commands, all of which must rely on the Task-Master CLI and surface clear progress / error messages to the user.\n\n1. Open PRD – runs `task-master open-prd <id>` or simply opens .taskmaster/docs/prd.txt when the selected node represents the project root.\n2. Show in Terminal – runs `task-master show <id>`.\n3. Mark Complete – runs `task-master complete <id>` then refreshes the tree.\n4. Add Task – opens an input box / quick-pick sequence to collect: title, description, priority, dependencies. When confirmed, run `task-master add --title \"…\" --description \"…\" --priority … --deps …`. Refresh the tree afterwards and reveal the new node.\n5. Delete Task –\n   a. Run `task-master validate-dependencies <id>` to determine if other tasks depend on the target.\n   b. If no dependents, confirm deletion and execute `task-master delete <id>`.\n   c. If dependents exist, show them and prompt the user. On confirmation, automatically run `task-master fix-dependencies --remove <id>` and then `task-master delete <id>`.\n   d. Refresh the tree.\n6. Manage Dependencies (context submenu or command palette):\n   • Add Dependency – `task-master add-dependency <srcId> <depId>`\n   • Remove Dependency – `task-master remove-dependency <srcId> <depId>`\n   • Validate Dependencies – `task-master validate-dependencies <id>` (result surfaced in an information message).\n7. Next Task – runs `task-master next` (optionally scoped to the selected node) and then reveals that task in the tree / opens quick-pick to navigate to it.\n8. Show Task Details – same behaviour as Show in Terminal but displayed in an editor tab or webview for richer formatting.\n\nAll menu commands must be registered in package.json, appear contextually (e.g., Delete only for leaf or confirmed tasks), and be covered by telemetry / logging hooks.",
+        "testStrategy": "Manual & automated tests (using vscode-test + mocha):\n1. For each command, verify the correct CLI call is assembled and executed (mock the binary in unit tests).\n2. Confirm the tree view refreshes and reflects changes after add, delete, complete, dependency edits.\n3. For Delete Task, prepare tasks with and without dependents and assert the proper confirmation flow and CLI commands sequence.\n4. Validate UI feedback: information, warning, and error messages appear appropriately, and navigation (reveal node, open webview) works.\n5. Integration smoke test: create a mini project, add several tasks with dependencies, mark some complete, run Next Task multiple times, ensuring ordering matches CLI output.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Scaffold new commands in package.json and command registration",
+            "status": "done"
+          },
+          {
+            "id": 2,
+            "title": "Implement Add Task flow with quick-pick and CLI invocation",
+            "status": "done"
+          },
+          {
+            "id": 3,
+            "title": "Implement Delete Task with dependency checks and confirmations",
+            "status": "done"
+          },
+          {
+            "id": 4,
+            "title": "Implement Dependency Management commands (add/remove/validate)",
+            "status": "done"
+          },
+          {
+            "id": 5,
+            "title": "Implement Next Task navigation and task details viewer",
+            "status": "done"
+          },
+          {
+            "id": 6,
+            "title": "Write unit tests mocking Task-Master CLI interactions",
+            "status": "done"
+          },
+          {
+            "id": 7,
+            "title": "End-to-end tests creating, deleting, and navigating tasks",
+            "status": "done"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Implement Status Bar & Telemetry",
+        "description": "Develop a status bar item to display the next actionable task and telemetry data.",
+        "details": "1. Create a status bar item using VS Code API.\n2. Display the next task using 'task-master next'.\n3. Show real-time AI token cost for Task Master v0.14 and above.",
+        "testStrategy": "Test the status bar updates and telemetry display with both mock and real data.",
+        "priority": "medium",
+        "dependencies": [
+          3
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "Create Settings UI",
+        "description": "Develop a settings interface that allows users to configure the CLI path and automatically persist the selected cycle view so users retain their preferred view across VS Code sessions.\n\nAll requirements have been fully implemented:\n• The CLI path configuration setting and runtime reading logic are finished and verified.\n• Cycle-view selection now persists via globalState and reliably restores on activation.\n• Legacy settings (refreshInterval, enableTelemetry, autoRefresh, securityLevel) have been entirely removed from the codebase and documentation.\n• A complete regression and quality-assurance pass was executed—TypeScript build, ESLint checks, security validation, and the full package build all passed with no issues.\n\nNo additional work remains.",
+        "status": "done",
+        "dependencies": [
+          3
+        ],
+        "priority": "medium",
+        "details": "1. CLI Path setting (COMPLETED)\n   • Exposed `myExtension.cliPath` string setting in package.json via `contributes.configuration`.\n   • `ConfigService` reads the configured value on demand and listens for configuration-change events so the new path is used without requiring a window reload.\n\n2. Cycle-view persistence (COMPLETED)\n   • `StatusBarService` stores the selected cycle-view identifier in `extensionContext.globalState` whenever the user switches views.\n   • On activation, `extension.ts` passes the extension context to `StatusBarService`, which immediately restores the last stored view.\n\n3. Remove legacy options (COMPLETED)\n   • Deleted `refreshInterval`, `enableTelemetry`, `autoRefresh`, and `securityLevel` settings from package.json.\n   • Updated `TaskMasterConfig` interface, simplified `CLIService`, and removed all telemetry functionality from `StatusBarService`.\n   • README and CHANGELOG updated to reflect the removals.\n   • Verified that the Settings UI no longer shows the obsolete options.\n\n4. Regression and runtime compliance (COMPLETED)\n   • Manual and automated tests executed:\n     – TypeScript compilation: PASSED\n     – ESLint code quality: PASSED (fixed curly-brace warning)\n     – Security validation: PASSED (0 issues, 0 warnings)\n     – Package build: PASSED\n   • Confirmed the extension activates without error in clean workspaces and in workspaces containing stale settings.\n",
+        "testStrategy": "All tests completed and passed:\n1. CLI Path\n   • Changing `myExtension.cliPath` in Settings immediately updates the runtime configuration; verified again after window reload.\n2. Cycle View Persistence\n   • Selecting a non-default cycle view and reloading VS Code restores the same view automatically.\n3. Legacy Setting Removal Regression\n   • Obsolete settings no longer appear in the Settings UI; no schema warnings for old keys present in user settings.json.\n   • Extension activates cleanly with and without stale settings present.\n4. Full Extension Smoke Test\n   • Activation succeeds with and without stored cycle-view state.\n   • All commands that rely on `cliPath` execute successfully.\n5. Quality & Security Gates\n   • TypeScript compilation, ESLint linting, security validation, and package build all passed with zero errors or warnings.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Add CLI path configuration setting",
+            "status": "done",
+            "description": "Expose a `myExtension.cliPath` string setting in package.json and read it in the extension."
+          },
+          {
+            "id": 2,
+            "title": "Persist selected cycle view",
+            "status": "done",
+            "description": "Store the chosen cycle view in globalState and restore it on activation."
+          },
+          {
+            "id": 3,
+            "title": "Update documentation and remove obsolete settings",
+            "status": "done",
+            "description": "Clean up references to refresh interval and telemetry in README and package.json."
+          },
+          {
+            "id": 4,
+            "title": "Testing & verification",
+            "status": "done",
+            "description": "Run manual and automated tests to confirm persistence, CLI path behavior, regression after removing obsolete settings, and overall build quality. All tests have passed."
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Ensure Security and Compliance",
+        "description": "Implement security measures and ensure compliance with VS Code marketplace requirements.",
+        "details": "1. Follow runtime-security guidelines to restrict network calls.\n2. Declare 'untrustedWorkspaces' limitations.\n3. Ensure package is signed and verify with CI.",
+        "testStrategy": "Conduct a security audit and verify compliance with marketplace guidelines.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 11,
+        "title": "Support Expand Task Command to Break Task into Subtasks",
+        "description": "Implement a feature to allow users to expand a task into multiple subtasks within the extension.",
+        "details": "To implement the 'expand task' command, first update the command palette to include a new command 'Expand Task'. This command should prompt the user to select a task to expand. Once a task is selected, provide an interface to define subtasks, including title, description, and dependencies for each subtask. Store these subtasks in the task management system, ensuring they are linked to the parent task. Update the task rendering logic to display subtasks hierarchically under their parent task. Consider using a collapsible tree view for better user experience. Ensure that the task data model supports nesting and that the task persistence layer can handle the new structure.",
+        "testStrategy": "1. Verify the 'Expand Task' command appears in the command palette and can be executed.\n2. Test the user interface for creating subtasks, ensuring all fields are functional and data is saved correctly.\n3. Check that subtasks are displayed under their parent task in the task view.\n4. Validate that the task data model correctly represents the hierarchy of tasks and subtasks.\n5. Ensure that the task persistence layer saves and loads tasks with subtasks accurately.\n6. Conduct user testing to ensure the feature is intuitive and meets user needs.",
+        "status": "done",
+        "dependencies": [
+          6
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 12,
+        "title": "Implement Tag Switching Functionality",
+        "description": "Enable users to switch between different task tags within the extension.",
+        "details": "To implement tag switching, first update the task management interface to include a dropdown or similar UI element that lists all available tags. This UI component should allow users to select a tag, which will filter the displayed tasks to only those associated with the selected tag. Ensure that the tag data is stored and retrieved efficiently, possibly using a caching mechanism to improve performance. Additionally, update the task rendering logic to dynamically display tasks based on the selected tag. Consider edge cases such as no tasks being associated with a selected tag and provide appropriate user feedback. Ensure the UI is intuitive and integrates seamlessly with existing task management features.",
+        "testStrategy": "1. Verify that the tag switching UI component is visible and functional within the task management interface.\n2. Test the functionality by selecting different tags and ensuring that only tasks associated with the selected tag are displayed.\n3. Check the performance of the tag switching feature, ensuring it operates smoothly without significant delay.\n4. Validate that the system handles cases where no tasks are associated with a selected tag, providing appropriate feedback to the user.",
+        "status": "done",
+        "dependencies": [
+          6,
+          11
+        ],
+        "priority": "high",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Extend Data Model and Caching for Tag Retrieval",
+            "description": "Introduce or update data structures so each task stores an associated tag list and the full set of tags can be fetched quickly with caching.",
+            "dependencies": [],
+            "details": "• Update DB schema / local storage to persist tag ↔︎ task relations.\n• Implement a tag repository/service with an in-memory cache (e.g., Map) that invalidates on task/tag mutation events.\n• Expose async methods: getAllTags(), getTasksByTag(tagId).\n• Ensure fallback to API/local storage when cache miss occurs.\n<info added on 2025-06-18T11:12:37.505Z>\n• Introduced strongly-typed models (TagInfo, TagServiceResponse, TagCacheEntry) to standardise tag payloads across services.  \n• Implemented TagService with a 30 s TTL in-memory cache for getAllTags() and getTasksByTag(), including automatic fallback to API/local storage on cache miss.  \n• Wired TaskCacheService to subscribe to tag events, enabling tag-aware cache refreshes after TASK_UPDATED / TAG_UPDATED mutations.  \n• Exposed tag operations (getAllTags, getTasksByTag, setCurrentTag) through TaskManagerService and the VS Code extension command layer.  \n• Adopted event-driven architecture: TagService emits TAG_CACHE_HIT, TAG_CACHE_MISS, and TAG_CACHE_INVALIDATED events consumed by UI and other services for instant updates.  \n• getAllTags()/getTasksByTag() now resolve to an empty array when no matching tags exist, preventing unhandled errors in consumer code.  \n• Persisted currentTag selection in .taskmaster/config.json, re-loading it on extension startup to restore user context.\n</info added on 2025-06-18T11:12:37.505Z>",
+            "status": "done",
+            "testStrategy": "Unit-test repository functions with mocked storage to verify cache hits/misses and correct data returns."
+          },
+          {
+            "id": 2,
+            "title": "Implement Client-Side Filtering Logic",
+            "description": "Create reusable functions/selectors that, given a tag ID, return only the tasks that match, leveraging the caching layer.",
+            "dependencies": [
+              1
+            ],
+            "details": "• In state management layer (Redux/Vuex/Context), add currentSelectedTag state.\n• Write filterTasksByTag(tagId) that subscribes to task list updates and memoizes results.\n• Ensure it returns empty array immediately if no tasks match, without throwing errors.\n<info added on 2025-06-18T11:19:54.605Z>\n• Added taskFilterUtils.ts housing a TaskFilterManager singleton that maintains per-tag cache with 5-second TTL and memoized results  \n• filterTasksByTag(tagId) now delegates to TaskFilterManager, aligning with server-side CLI tag switching while providing local caching  \n• Introduced helper functions setCurrentSelectedTag, getCurrentSelectedTag and clearFilterCache; state stays in sync via Tag change events emitted by TaskManagerService  \n• Wired TaskFilterManager into TaskCacheService and TagService for automatic cache warm-up, validation and stale-data invalidation  \n• Exposed getFilterStats utility for debugging cache hit/miss ratios and entry age  \n• Verified empty arrays are returned gracefully for unknown or empty tag queries\n</info added on 2025-06-18T11:19:54.605Z>",
+            "status": "done",
+            "testStrategy": "Unit tests verifying correct subsets are returned for existing, non-existing, and undefined tag values."
+          },
+          {
+            "id": 3,
+            "title": "Create Tag Selector UI Component",
+            "description": "Add a dropdown (or segmented control) that lists all available tags and triggers selection events.",
+            "dependencies": [
+              1
+            ],
+            "details": "• Build a reusable <TagDropdown /> component.\n• On mount, call getAllTags() to populate options.\n• Emit onTagSelected(tagId) when user chooses a tag.\n• Apply current theme/styles and ensure keyboard accessibility.\n<info added on 2025-06-18T12:12:49.153Z>\n• Added TagCommands class exposing selectTag(), quickSwitchTag(), and showCurrentTagInfo() handlers that open a VS Code QuickPick powered by getAllTags(), emit tag-change events, and invoke CLI commands (tags / use-tag) with robust error handling  \n• Extended StatusBarService with a dynamic tag item showing the active tag and task count; click action launches the TagDropdown  \n• Registered “Select Tag” command, status-bar item, and toolbar button in package.json with theme-aware icons and proper menu placement  \n• Wired event bus so tree view and status bar automatically refresh on tag-change; user receives informational toast notifications  \n• Ensured full keyboard navigation, current-tag highlighting, and theme adherence across QuickPick, toolbar, and status-bar entry\n</info added on 2025-06-18T12:12:49.153Z>\n<info added on 2025-06-18T12:16:48.584Z>\n• Refactored TagService to default “tags” and “use-tag” invocations to --format=text and introduced parseTagsOutput() for decoding ASCII table rows (handles current-tag glyph, column spacing, and metadata columns)  \n• Enhanced setCurrentTag() to scan command stdout for “(current)” or “Switched to tag” markers and throw descriptive TagSwitchError on failure  \n• Implemented centralized handleCliResponse() utility providing fallback parsing, structured logging, and metrics on mismatched formats  \n• Updated TagCommands.selectTag/quickSwitchTag to request text mode and rely on TagService for parsed results; added unit tests covering varied CLI outputs and malformed tables\n</info added on 2025-06-18T12:16:48.584Z>",
+            "status": "done",
+            "testStrategy": "Component tests for correct rendering, option population, focus/keyboard support, and event emission."
+          },
+          {
+            "id": 4,
+            "title": "Integrate Tag Selector with Task Rendering & Edge-Case Handling",
+            "description": "Wire the UI component to filtering logic so task list dynamically updates, and provide user feedback when no tasks exist for a tag.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "• Subscribe task list UI to filterTasksByTag(currentSelectedTag).\n• Display an informative empty-state message when the returned list length is 0.\n• Maintain previous scroll position or reset appropriately on tag change.\n• Debounce rapid tag changes to prevent unnecessary renders.",
+            "status": "done",
+            "testStrategy": "E2E tests simulating tag switches; verify task list updates correctly and empty-state message appears as needed."
+          },
+          {
+            "id": 5,
+            "title": "Comprehensive Testing, Performance Tuning & Documentation",
+            "description": "Finalize feature with integrated tests, performance profiling, and developer/user documentation.",
+            "dependencies": [
+              4
+            ],
+            "details": "• Run regression and cross-browser tests.\n• Profile filtering/rendering with large datasets; optimize memoization or virtualization if needed.\n• Update README/Help screens with tag-switching instructions.\n• Conduct code review & merge.",
+            "status": "done",
+            "testStrategy": "Automated CI pipeline executing all unit, component, and E2E suites; manual UX walkthrough to confirm smooth interaction."
+          }
+        ]
+      },
+      {
+        "id": 13,
+        "title": "Add Update Task Option to Task Menu",
+        "description": "Integrate an option in the task menu to update existing tasks.",
+        "details": "To add the update task functionality to the task menu, first modify the task menu interface to include a new option labeled 'Update Task'. This option should be accessible when a task is selected. Upon selection, present the user with a form pre-filled with the current task details, allowing them to edit fields such as title, description, and dependencies. Ensure that changes are validated and saved correctly to the task management system. Update the task rendering logic to reflect any changes immediately. Consider implementing a confirmation dialog to prevent accidental updates. Additionally, ensure that the update operation is logged for audit purposes.",
+        "testStrategy": "1. Verify that the 'Update Task' option appears in the task menu when a task is selected.\n2. Test the update form to ensure it is pre-filled with the correct task details and allows editing.\n3. Validate that changes are saved correctly and reflected in the task view immediately.\n4. Check for the presence of a confirmation dialog before saving changes.\n5. Ensure that update operations are logged correctly for auditing purposes.",
+        "status": "done",
+        "dependencies": [
+          6,
+          11
+        ],
+        "priority": "high",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Add 'Update Task' entry to task menu UI",
+            "description": "Extend the task menu component so that, when a task row/card is right-clicked or otherwise selected, an additional menu item labelled 'Update Task' appears.",
+            "dependencies": [],
+            "details": "• Modify the menu component definition (e.g., TaskMenu.tsx) to inject a new MenuItem.\n• Gate its visibility by whether a valid taskId is in context.\n• Wire the click handler to emit an 'open-update-task' event (or route change) with the selected task’s ID.",
+            "status": "done",
+            "testStrategy": "Unit: Render menu with/without selected task and assert presence of item. UI: Simulate click and verify navigation/event."
+          },
+          {
+            "id": 5,
+            "title": "Comprehensive testing and QA handoff",
+            "description": "Write automated tests, perform cross-browser checks, and update documentation for the new update flow.",
+            "dependencies": [
+              4
+            ],
+            "details": "• Add Cypress/Playwright E2E covering the happy path, validation errors, cancellation, and audit log creation.\n• Verify accessibility (keyboard navigation, ARIA labels).\n• Update user guide/README.\n• Prepare changelog entry.",
+            "status": "done",
+            "testStrategy": "Run full test suite in CI. QA smoke test on staging with different roles and screen sizes."
+          }
+        ]
+      },
+      {
+        "id": 14,
+        "title": "Add Analyze Complexity Button",
+        "description": "Integrate a button to run the analyze-complexity function next to the add task button in the task management interface.",
+        "details": "To implement the analyze-complexity button, first update the task management interface to include a new button labeled 'Analyze Complexity' adjacent to the existing 'Add Task' button. This button should trigger the analyze-complexity function, which evaluates the complexity of tasks based on predefined criteria such as task dependencies, estimated time, and resource requirements. Ensure the function is integrated seamlessly with the existing task management system and that it provides feedback to the user, such as a complexity score or a detailed report. Update the UI to display the results in a user-friendly manner, possibly using a modal or a dedicated section in the task view. Consider performance implications and ensure the function executes efficiently without significant delay.",
+        "testStrategy": "1. Verify the 'Analyze Complexity' button is visible and correctly positioned next to the 'Add Task' button.\n2. Test the button functionality by clicking it and ensuring it triggers the analyze-complexity function.\n3. Validate that the complexity analysis results are displayed correctly and are accurate based on known task data.\n4. Check the performance of the complexity analysis to ensure it completes within an acceptable time frame without degrading the UI responsiveness.",
+        "status": "done",
+        "dependencies": [
+          11,
+          12
+        ],
+        "priority": "high",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Expose analyze-complexity API endpoint",
+            "description": "Ensure the analyze-complexity function is available to the frontend via a REST (or GraphQL) endpoint that returns a structured complexity report.",
+            "dependencies": [],
+            "details": "• Review existing analyze-complexity implementation and move any synchronous logic to an async service if needed.\n• Define request/response schema (e.g., POST /api/tasks/complexity => { score:number, breakdown:{…} }).\n• Add input validation (task IDs, project scope).\n• Return HTTP 202 with polling or HTTP 200 depending on expected latency (<1 s vs >1 s).\n• Write unit tests for edge cases (no tasks, circular dependencies, large task sets).",
+            "status": "done",
+            "testStrategy": "Mock a variety of task lists and assert correct status codes and JSON schema using automated tests (Jest, pytest, etc.)."
+          },
+          {
+            "id": 2,
+            "title": "Add 'Analyze Complexity' button to task management UI",
+            "description": "Insert a new button adjacent to the existing 'Add Task' button in the toolbar/header of the task management view.",
+            "dependencies": [
+              1
+            ],
+            "details": "• Update the UI component (e.g., Toolbar.jsx / TaskHeader.vue) to include a <Button>Analyze Complexity</Button> element.\n• Apply consistent styling, iconography, and tooltips per design system.\n• Ensure button is disabled when there are no tasks or while an analysis request is in flight.",
+            "status": "done",
+            "testStrategy": "Render component in Storybook; verify visual placement and disabled state toggling with unit tests."
+          },
+          {
+            "id": 3,
+            "title": "Implement click handler and API integration",
+            "description": "Wire the new button’s onClick event to call the analyze-complexity endpoint and handle asynchronous states.",
+            "dependencies": [
+              2
+            ],
+            "details": "• Create useAnalyzeComplexity hook/service that sends the API request (axios/fetch) and returns {loading, data, error}.\n• Show a spinner or progress bar while loading.\n• Gracefully handle API errors (e.g., toast notification with retry option).\n• Cache recent results to avoid duplicate calls within same session if tasks unchanged.",
+            "status": "done",
+            "testStrategy": "Mock API with success & failure responses; assert UI state transitions using integration tests (React Testing Library/Vue Test Utils)."
+          },
+          {
+            "id": 4,
+            "title": "Design and integrate complexity results display",
+            "description": "Create a modal or dedicated pane that presents the complexity score and detailed breakdown returned by the API.",
+            "dependencies": [
+              3
+            ],
+            "details": "• Build ComplexityReport component: header (overall score), table/chart for breakdown (dependencies count, estimated hours, resources).\n• Highlight high-risk metrics with color coding.\n• Allow users to close, re-run analysis, or export report (PDF/CSV placeholder).\n• Ensure accessibility (focus trapping, ARIA labels) and responsive design.",
+            "status": "done",
+            "testStrategy": "Visual regression tests with multiple data sets; Lighthouse accessibility audit."
+          },
+          {
+            "id": 5,
+            "title": "Performance, UX polish, and regression testing",
+            "description": "Optimize API execution time, finalize UI/UX details, and ensure new features do not break existing functionality.",
+            "dependencies": [
+              4
+            ],
+            "details": "• Profile backend function; add indexing or in-memory caching if average response >1 s.\n• Lazy-load heavy chart libraries.\n• Conduct cross-browser testing and verify mobile responsiveness.\n• Update end-to-end tests (Cypress/Playwright) covering add task + analyze flow.\n• Update documentation and release notes.",
+            "status": "done",
+            "testStrategy": "Run load tests with various task volumes; execute full regression test suite in CI and compare baseline performance metrics."
+          }
+        ]
+      },
+      {
+        "id": 15,
+        "title": "Implement CLI Integration Tests",
+        "description": "Develop integration tests for the Task Master CLI to automate testing without manual packaging.",
+        "details": "To implement CLI integration tests, create a test suite using a testing framework like Mocha or Jest. These tests should execute the Task Master CLI commands, such as 'task-master list --with-subtasks --json', using Node.js's ChildProcess module. Capture and parse the CLI output to verify that the commands produce the expected results. Ensure that the tests cover various scenarios, including edge cases and error handling. Mock any external dependencies to isolate the CLI's functionality during testing. Additionally, set up a continuous integration pipeline to run these tests automatically on each commit.",
+        "testStrategy": "1. Set up a testing environment with Mocha or Jest.\n2. Write test cases to execute CLI commands and capture their output.\n3. Verify that the output matches expected results for various scenarios, including normal operations and edge cases.\n4. Mock external dependencies to ensure tests focus on CLI functionality.\n5. Integrate the test suite into a CI pipeline to ensure tests run automatically on each commit.",
+        "status": "done",
+        "dependencies": [
+          2
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 16,
+        "title": "Prompt User for Research Option in Analyze Complexity",
+        "description": "Enhance the analyze-complexity function to prompt users for research options before execution.",
+        "details": "To implement this feature, modify the analyze-complexity function to include a user prompt that asks whether they want to conduct additional research related to the complexity analysis. This prompt should appear immediately after the user initiates the analyze-complexity function via the interface. If the user opts for research, provide options or links to relevant resources or tools that can assist in understanding or mitigating task complexity. Ensure the prompt is non-intrusive and integrates smoothly with the existing UI. Consider using a modal dialog or a notification banner for the prompt. Update the function logic to handle user responses appropriately, proceeding with the analysis if the user declines research.",
+        "testStrategy": "1. Trigger the analyze-complexity function and verify that a prompt appears asking the user if they want to conduct research.\n2. Test the user interface to ensure the prompt is clear and provides actionable options for research.\n3. Validate that selecting 'Yes' for research provides appropriate resources or links.\n4. Ensure that selecting 'No' proceeds with the complexity analysis without interruption.\n5. Check that the prompt integrates seamlessly with the existing UI and does not disrupt the user experience.",
+        "status": "done",
+        "dependencies": [
+          14
+        ],
+        "priority": "medium",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design User Prompt for Research Option",
+            "description": "Create a user prompt that asks whether the user wants to conduct additional research related to the complexity analysis.",
+            "dependencies": [],
+            "details": "The prompt should be clear and concise, informing users about the option to access additional resources or tools to understand or mitigate task complexity. Ensure the language is user-friendly and aligns with the overall tone of the application.",
+            "status": "done",
+            "testStrategy": "Conduct usability testing to ensure the prompt is easily understood and effectively communicates the research option to users."
+          },
+          {
+            "id": 2,
+            "title": "Select Appropriate UI Component for Prompt Display",
+            "description": "Choose a suitable UI component, such as a modal dialog or notification banner, to display the user prompt.",
+            "dependencies": [
+              1
+            ],
+            "details": "Evaluate the pros and cons of using modal dialogs versus notification banners. Modal dialogs are effective for capturing user attention but can be intrusive, while notification banners are less disruptive but may be overlooked. Consider the user experience and the importance of the prompt in the workflow.",
+            "status": "done",
+            "testStrategy": "A/B test different UI components to determine which one provides the best balance between visibility and user experience."
+          },
+          {
+            "id": 3,
+            "title": "Integrate User Prompt into analyze-complexity Function",
+            "description": "Modify the analyze-complexity function to include the user prompt immediately after initiation.",
+            "dependencies": [
+              2
+            ],
+            "details": "Ensure that the prompt appears seamlessly after the user initiates the analyze-complexity function. The integration should not disrupt the existing workflow and should provide a smooth user experience.",
+            "status": "done",
+            "testStrategy": "Perform integration testing to verify that the prompt appears at the correct time and does not cause any disruptions or errors in the function's execution."
+          },
+          {
+            "id": 4,
+            "title": "Provide Relevant Research Resources Based on User Response",
+            "description": "Offer options or links to relevant resources or tools if the user opts for additional research.",
+            "dependencies": [
+              3
+            ],
+            "details": "Curate a list of high-quality resources that can assist users in understanding or mitigating task complexity. Ensure that the resources are up-to-date and relevant to the user's needs.",
+            "status": "done",
+            "testStrategy": "Validate the relevance and accessibility of the provided resources through user feedback and regular reviews."
+          },
+          {
+            "id": 5,
+            "title": "Handle User Responses Appropriately",
+            "description": "Update the function logic to proceed with the analysis if the user declines research, or to display resources if the user accepts.",
+            "dependencies": [
+              4
+            ],
+            "details": "Implement logic to handle both user responses: continue with the complexity analysis if the user declines additional research, or display the curated resources if the user accepts. Ensure that the transition between these states is smooth and intuitive.",
+            "status": "done",
+            "testStrategy": "Conduct end-to-end testing to ensure that the function behaves correctly based on different user responses and that the user experience remains consistent."
+          }
+        ]
+      },
+      {
+        "id": 17,
+        "title": "Enable Right-Click Menu on Subtasks",
+        "description": "Implement a right-click context menu for subtasks in the task-management interface that lets users update details, change status, and remove a subtask. All persistence is handled locally through the task-master CLI data layer—there is no separate backend API.\n\nUPDATED STATUS (2024-06-11):\n• Right-click (contextmenu) interception on subtask elements is complete and merged (#17.1).\n• Custom context-menu UI with three actions (Update, Change Status, Remove) is fully implemented (#17.2).\n• Commands are registered in package.json and correctly wired to CLI services (#17.3).\n• Validation, error handling, and data persistence through TaskManagerService / TaskOperationsService confirmed via smoke tests.\n\nREMAINING WORK:\n1. Style & accessibility polish for the menu (high-contrast variables, focus ring, keyboard interaction edge cases).\n2. Robust cross-browser verification—including touch/long-press on supported devices—and formal accessibility validation (ARIA, screen-reader flows).\n3. Regression test pass to ensure no viewport-collision or dismissal issues.\n\nAll subsequent development must focus exclusively on UI/UX refinement, accessibility, and testing. Re-implementation of completed functionality is out of scope.",
+        "status": "done",
+        "dependencies": [
+          13
+        ],
+        "priority": "medium",
+        "details": "Implementation guidance for remaining tasks:\n\n• Styling: Ensure the .tm-context-menu follows design-system spacing (8-pt grid) and leverages CSS custom properties defined in theme-helpers.css. Provide explicit focus outline (2px solid var(--tm-focus-border)).\n• Accessibility: The menu element must keep role=\"menu\" with menuitem roles on children. Confirm ArrowUp/ArrowDown cycling, Home/End shortcuts, Enter/Space activation, and Esc dismissal with focus return.\n• Viewport collision: Current util.resizeToFit handles most cases—add unit tests for min-height scenarios and RTL layouts.\n• Browser matrix: Chrome ≥113, Firefox ≥111, Safari ≥16, Edge ≥113 on desktop; Chrome/Firefox on Android and Safari on iPadOS with external keyboard.\n• Error surfacing: The service layer already returns typed errors; surface them via toast notifications (toast.error) without console noise.\n• Touch: Verify long-press shows the same menu on touch devices (TreeView already sends contextmenu event after 500 ms long-press in VS Code 1.83+).\n\nNo additional business logic changes are required—focus on polish and compliance.",
+        "testStrategy": "1. Visual & behavioral validation\n   a. Right-click on any subtask: custom menu appears, native menu suppressed.\n   b. Verify Update, Change Status, and Remove all function (already pass smoke tests).\n\n2. Accessibility\n   a. Navigate entire menu using keyboard—Tab to first item, Arrow keys cycle, Home/End jump, Enter/Space activates, Esc closes and restores focus.\n   b. Screen-reader (NVDA, VoiceOver, JAWS) announces menu role and each item label.\n\n3. Styling & theming\n   a. High-contrast themes: check contrast ≥4.5:1 for text and focus indicators.\n   b. Verify focus ring visibility on Windows High Contrast and macOS Increase Contrast.\n\n4. Viewport & positioning\n   a. Open menu near all four viewport edges and corners—menu must reposition to stay fully visible.\n   b. Test <400 px height window and RTL layout.\n\n5. Cross-browser & device matrix\n   a. Desktop: Chrome, Firefox, Safari, Edge (latest two major versions).\n   b. Touch: Chrome on Android 14 tablet, Safari on iPadOS 17; confirm long-press opens menu.\n\n6. Regression\n   a. Rapid open/close cycles (double-right-click) should not leave orphaned DOM nodes.\n   b. Ensure no console errors or unhandled promise rejections during all scenarios.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Intercept right-click events on subtask elements",
+            "status": "done"
+          },
+          {
+            "id": 2,
+            "title": "Build custom context menu with Update, Change Status, and Remove actions",
+            "status": "done",
+            "details": "<info added on 2025-06-19T15:16:38.288Z>\nGoal\nCreate a clear, user-friendly context menu that appears when the user right-clicks a subtask.\n\nAcceptance Criteria\n• Context menu pops up at the cursor position on right-click.  \n• Options shown:  \n  – Rename / Edit  \n  – Change Status ▸ (Todo, In-Progress, Done)  \n  – Delete  \n• Menu closes when the user clicks elsewhere, presses Esc, or selects an option.  \n• Keyboard support: arrow keys to navigate, Enter to confirm, Esc to cancel.  \n• Use semantic HTML (ul/li) with role=\"menu\"/role=\"menuitem\" plus ARIA-labels for accessibility.  \n• Style matches existing dark theme; z-index keeps menu above other elements.  \n• No page scroll jump or text selection should occur when the menu opens.\n\nImplementation Notes\n1. Add ContextMenu.tsx component that receives (x, y, subtaskId) props.  \n2. Mount the component via a Portal to body to avoid clipping in nested containers.  \n3. Persist menu state in UI store (Redux/Context) so only one menu can be open.  \n4. Clean up event listeners on unmount to prevent memory leaks.  \n5. Provide unit tests for open/close logic and keyboard navigation.\n</info added on 2025-06-19T15:16:38.288Z>"
+          },
+          {
+            "id": 3,
+            "title": "Wire menu actions to task-master CLI (update, status change, delete)",
+            "status": "done"
+          },
+          {
+            "id": 4,
+            "title": "Style menu and ensure accessibility compliance",
+            "status": "done"
+          }
+        ]
+      },
+      {
+        "id": 18,
+        "title": "Add Fix Subtasks Action to Task Menu",
+        "description": "Implement an action in the task menu to fix subtask IDs by converting them from a string format with parent ID to a simple numeric ID.",
+        "details": "To implement the 'Fix Subtasks' action in the task menu, first update the task menu interface to include a new option labeled 'Fix Subtasks'. This option should be available when a task with subtasks is selected. Upon selection, the system should iterate through the subtasks of the selected task, identify any subtasks with IDs in the format 'parentID.subtaskID', and convert these to a simple numeric format by removing the parent ID prefix. Ensure that the changes are persisted correctly in the task management system and that the task rendering logic is updated to reflect these changes immediately. Consider edge cases such as duplicate subtask IDs after conversion and handle them appropriately.",
+        "testStrategy": "1. Verify that the 'Fix Subtasks' option appears in the task menu when a task with subtasks is selected.\n2. Test the functionality by selecting the option and ensuring that subtask IDs are converted from 'parentID.subtaskID' to a simple numeric format.\n3. Validate that the changes are saved correctly and reflected in the task view immediately.\n4. Check for edge cases such as duplicate subtask IDs after conversion and ensure they are handled correctly.",
+        "status": "done",
+        "dependencies": [
+          13,
+          17
+        ],
+        "priority": "high",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-06-17T14:01:27.651Z",
+      "updated": "2025-06-19T15:16:52.374Z",
+      "description": "Tasks for master context"
+    }
+  }
+}
