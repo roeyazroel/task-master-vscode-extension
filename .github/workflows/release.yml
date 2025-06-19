@@ -83,7 +83,7 @@ jobs:
       #     VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
       - name: Upload release artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: extension-package
           path: "*.vsix"
