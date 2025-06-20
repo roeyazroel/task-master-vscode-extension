@@ -576,11 +576,165 @@
             "testStrategy": "Test the UI updates by executing the parse-prd command through the context menu and verifying that the status and results are displayed correctly."
           }
         ]
+      },
+      {
+        "id": 21,
+        "title": "Add Workspace Support for Task-Master Configuration",
+        "description": "Enhance the extension so that it can intelligently detect whether the user has opened a single-folder repository or a multi-root VSCode workspace.  In workspace mode the UI tree must add a repository-level grouping that aggregates and displays all tasks (including *Current* and *Next*) under the corresponding repo node.  After context detection the extension must locate and apply an authoritative .taskmaster configuration using the rules below.",
+        "status": "pending",
+        "dependencies": [
+          11,
+          17
+        ],
+        "priority": "high",
+        "details": "Task-Master currently looks for a configuration folder inside each individual repository and renders a global task tree.  With true workspace support we now need two parallel enhancements:\n\nA. Context & configuration lookup (previous requirement, unchanged in spirit)\n------------------------------------------------------------\n1. Detect context\n   • Multi-root workspace: treat the workspace file (.code-workspace) as the top-level context.\n   • Single-folder: treat the opened folder as both workspace and repository.\n\n2. Configuration search strategy\n   a. Multi-root workspace: look for a .taskmaster folder at workspace root.  If present, apply it to all repos; otherwise fall back to per-repo configs.\n   b. Single-folder: look only inside the opened folder for .taskmaster.\n\n3. Precedence: workspace-level config > repo-level config > extension defaults.\n\n4. Edge cases still apply (multiple configs, dynamic folder add/remove, etc.).\n\nB. Tree-view re-architecture (NEW requirement)\n------------------------------------------------------------\n1. When the extension detects workspace mode, the Task Tree view must introduce an additional level: Repository node ➞ {Current | Next | All Tasks | custom groups}.\n2. Each repo node aggregates tasks belonging to that folder only; workspace-level commands may still operate on every repo under the hood.\n3. Single-folder mode keeps the existing flat tree for backward compatibility.\n4. The provider must react to dynamic workspace changes (folder addition/removal) and update the repo nodes in real-time.\n5. Telemetry/logging: emit diagnostics when tasks cannot be mapped to a repo node.\n6. Documentation & examples must illustrate the new tree structure side-by-side with configuration precedence rules.",
+        "testStrategy": "1. Single-folder mode\n   • Open a lone repository with its own .taskmaster folder.\n   • Verify the tree view contains no repository wrapper node and the existing structure remains intact.\n\n2. Workspace mode with workspace-level config\n   • Create a workspace containing three Git folders plus a .taskmaster folder at workspace root.\n   • Confirm that a repo node appears for each folder and that Current/Next/All Tasks underneath each node reflect the workspace-level config.\n\n3. Workspace mode without workspace-level config\n   • Remove the root config and place .taskmaster folders in two repos only.\n   • Ensure each of those two repos show their respective tasks while the third repo falls back to defaults.\n\n4. Conflict precedence\n   • Put both workspace-level and repo-level configs for one repo.\n   • Verify workspace config wins; a warning should appear and the tree reflects workspace settings.\n\n5. Dynamic workspace update\n   • Add and remove folders while VSCode is running.  Confirm repo nodes are added/removed and inherit the correct tasks instantly.\n\n6. UI regression\n   • Snapshot test the tree provider to guarantee deterministic ordering and hierarchy.\n\n7. Manual smoke tests on Windows/macOS/Linux for path handling, workspace detection, and tree rendering (light/dark themes, accessibility, collapsible states).",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Refactor Task Tree provider to support repository-level root nodes in workspace mode",
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "title": "Implement task aggregation logic per repository and wire Current/Next views under each repo node",
+            "status": "pending"
+          },
+          {
+            "id": 3,
+            "title": "Update context detector to notify tree provider when switching between single-folder and workspace modes",
+            "status": "pending"
+          },
+          {
+            "id": 4,
+            "title": "Add unit & integration tests for new tree hierarchy and dynamic workspace changes",
+            "status": "pending"
+          },
+          {
+            "id": 5,
+            "title": "Update documentation and screenshots to illustrate repository-level tree structure and configuration precedence",
+            "status": "pending"
+          }
+        ]
+      },
+      {
+        "id": 22,
+        "title": "Implement Subtask Management CLI Commands",
+        "description": "Develop CLI commands to manage subtasks, including adding, converting, removing, and clearing subtasks, with optional support for operating within a VS Code workspace file.",
+        "status": "pending",
+        "dependencies": [
+          11,
+          18
+        ],
+        "priority": "high",
+        "details": "Implement the following CLI commands for subtask management. Each command now accepts an optional `--workspace=<path/to/workspace.code-workspace>` parameter that, when supplied, limits all operations to tasks contained in the specified VS Code workspace file. When omitted, the commands operate on the current/default workspace as previously defined.\n\n1. `add-subtask --parent=<id> --title=\"<title>\" [--description=\"<desc>\"] [--workspace=<file>]`: Add a new subtask to a specified parent task within the chosen workspace.\n\n2. `add-subtask --parent=<id> --task-id=<id> [--workspace=<file>]`: Convert an existing task into a subtask of a specified parent task. Works across workspaces; if the parent and child belong to different workspaces, raise a validation error unless an explicit `--force-cross-workspace` flag (to be considered in later iterations) is added.\n\n3. `remove-subtask --id=<parentId.subtaskId> [--convert] [--workspace=<file>]`: Remove a subtask from a parent task. If `--convert` is used, convert the subtask into a standalone task (still within the same workspace unless overridden).\n\n4. `clear-subtasks --id=<id> [--workspace=<file>]`: Remove all subtasks from a specified task within the chosen workspace.\n\n5. `clear-subtasks --all [--workspace=<file>]`: Remove all subtasks from all tasks. If `--workspace` is provided, restrict the operation to that workspace; otherwise it applies globally across workspaces.\n\nEnsure that:\n• The task management system persists workspace information on every update.\n• Appropriate errors are shown for invalid or missing workspace files, or when attempting to manipulate tasks across different workspaces without permission.\n• Legacy behaviour (no `--workspace`) remains backward-compatible.\n\nEdge cases to consider include non-existent parent tasks, converting an already-subtask task, and referencing workspace files that cannot be located or parsed.",
+        "testStrategy": "1. Test `add-subtask` with and without the `--workspace` flag; verify the subtask appears in the correct workspace hierarchy.\n2. Convert an existing task into a subtask within the same workspace and across different workspaces; confirm correct validation behaviour.\n3. Validate `remove-subtask` with and without `--convert`, ensuring the target workspace file is updated appropriately.\n4. Use `clear-subtasks --id=<id>` on a task in a workspace file and verify all subtasks are removed only from that workspace.\n5. Execute `clear-subtasks --all --workspace=<file>` and confirm subtasks are removed exclusively from the specified workspace; run again without `--workspace` and confirm removal across all workspaces.\n6. Test invalid workspace paths or corrupted `.code-workspace` files and verify informative error messages are displayed.\n7. Regression tests: run original commands without the new flag to ensure backward compatibility and unchanged behaviour in the default workspace.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design CLI Command Specifications",
+            "description": "Define the syntax, required parameters, optional flags (including `--workspace`), and expected outputs for each subtask management command.",
+            "dependencies": [],
+            "details": "Update and finalise specifications for `add-subtask`, `remove-subtask`, and `clear-subtasks`, incorporating the new optional `--workspace` parameter and documenting its behaviour, defaults, and limitations.",
+            "status": "pending",
+            "testStrategy": "Develop unit tests that validate the correctness of command specifications—ensuring the parser accepts valid combinations of parameters (with/without `--workspace`) and rejects invalid ones."
+          },
+          {
+            "id": 2,
+            "title": "Implement Command Parsing and Validation",
+            "description": "Develop the logic to parse user input and validate command parameters for the subtask management commands.",
+            "dependencies": [
+              1
+            ],
+            "details": "Enhance input parsing mechanisms to recognise the `--workspace` flag. Validate that provided workspace paths exist and point to readable `.code-workspace` files.",
+            "status": "pending",
+            "testStrategy": "Create test cases verifying that parsing correctly interprets user input and that validation mechanisms catch invalid parameters or workspace paths."
+          },
+          {
+            "id": 3,
+            "title": "Integrate Commands with Task Management System",
+            "description": "Connect the parsed and validated commands to the underlying task management system to perform the desired operations.",
+            "dependencies": [
+              2
+            ],
+            "details": "Modify data-access layers so that task CRUD operations respect the selected workspace context, persisting changes in the correct workspace file or database namespace.",
+            "status": "pending",
+            "testStrategy": "Conduct integration tests showing that commands correctly modify task/subtask data in the designated workspace and handle edge cases."
+          },
+          {
+            "id": 4,
+            "title": "Implement User Feedback and Error Handling",
+            "description": "Provide clear feedback to users upon command execution and handle errors gracefully.",
+            "dependencies": [
+              3
+            ],
+            "details": "Update success and error messages to include workspace context where relevant (e.g., \"Subtask added to task 42 in workspace myproj.code-workspace\").",
+            "status": "pending",
+            "testStrategy": "Simulate various scenarios—including missing workspace, invalid path, and cross-workspace conflicts—and verify that feedback is accurate and helpful."
+          },
+          {
+            "id": 5,
+            "title": "Develop Comprehensive Documentation",
+            "description": "Create detailed documentation for each subtask management command, including usage examples and troubleshooting tips.",
+            "dependencies": [
+              4
+            ],
+            "details": "Document the new `--workspace` option, provide examples for single and multi-workspace usage, and outline best practices for managing subtasks across workspaces.",
+            "status": "pending",
+            "testStrategy": "Review documentation for accuracy and clarity, and gather user feedback to identify areas for improvement."
+          }
+        ]
+      },
+      {
+        "id": 23,
+        "title": "Standardize VSCode Notifications with Loading Indicators",
+        "description": "Enhance VSCode notifications to include standardized loading indicators for long-running tasks such as updating and expanding.",
+        "details": "To implement standardized VSCode notifications with loading indicators, first identify all long-running tasks within the extension that currently trigger notifications. Modify these notifications to include a loading indicator using VSCode's `window.withProgress` API. This API allows for the display of a progress indicator in the VSCode UI, which can be either a progress bar or a spinner. Ensure that the loading indicator is displayed at the start of the task and is updated or completed once the task finishes. Additionally, ensure that all notifications follow a consistent format, including a clear title, message, and optional actions. Consider edge cases where tasks may fail or be cancelled, and ensure the loading indicator reflects these states appropriately.",
+        "testStrategy": "1. Identify all long-running tasks that trigger notifications and verify that each now includes a loading indicator using the `window.withProgress` API. 2. Simulate long-running tasks and observe the loading indicator's behavior, ensuring it starts, updates, and completes correctly. 3. Test scenarios where tasks fail or are cancelled to ensure the loading indicator reflects these states accurately. 4. Verify that all notifications follow a consistent format with clear titles and messages.",
+        "status": "pending",
+        "dependencies": [
+          21,
+          22
+        ],
+        "priority": "low",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Identify Long-Running Tasks Triggering Notifications",
+            "description": "Review the extension's codebase to pinpoint all long-running tasks that currently trigger notifications, such as updating and expanding operations.",
+            "dependencies": [],
+            "details": "Examine the extension's source code to locate functions or processes that initiate notifications for tasks expected to take a significant amount of time. Document these tasks for further modification.",
+            "status": "pending",
+            "testStrategy": "Verify that all identified tasks are correctly listed and that no long-running task triggering a notification is overlooked."
+          },
+          {
+            "id": 2,
+            "title": "Implement Loading Indicators Using `window.withProgress` API",
+            "description": "Modify the identified notifications to include loading indicators by utilizing VSCode's `window.withProgress` API.",
+            "dependencies": [
+              1
+            ],
+            "details": "For each long-running task identified, refactor the notification code to use the `window.withProgress` API. This API allows displaying a progress indicator, such as a spinner or progress bar, in the VSCode UI. Ensure the loading indicator starts at the beginning of the task and updates or completes upon task completion. Handle scenarios where tasks may fail or be canceled, updating the loading indicator accordingly.",
+            "status": "pending",
+            "testStrategy": "For each modified notification, initiate the corresponding long-running task and confirm that the loading indicator appears at the start, updates appropriately during the task, and disappears upon completion. Test failure and cancellation scenarios to ensure the loading indicator reflects these states correctly."
+          },
+          {
+            "id": 3,
+            "title": "Standardize Notification Format",
+            "description": "Ensure all notifications follow a consistent format, including a clear title, message, and optional actions.",
+            "dependencies": [
+              2
+            ],
+            "details": "Review and update all notifications to adhere to a standardized format. Each notification should have a clear and concise title, an informative message, and, if applicable, actions that the user can take. This standardization enhances user experience and maintains consistency across the extension.",
+            "status": "pending",
+            "testStrategy": "Trigger each notification and verify that it displays with the standardized title, message, and any applicable actions. Ensure that the format is consistent across all notifications within the extension."
+          }
+        ]
       }
     ],
     "metadata": {
       "created": "2025-06-17T14:01:27.651Z",
-      "updated": "2025-06-20T12:20:04.170Z",
+      "updated": "2025-06-20T20:18:16.984Z",
       "description": "Tasks for master context"
     }
   }

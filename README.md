@@ -274,6 +274,43 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Claude Task Master CLI](https://github.com/eyaltoledano/claude-task-master.git) - The underlying CLI tool
 - [Task Master Documentation](https://task-master.dev) - Comprehensive documentation
 
+## Roadmap
+
+### Upcoming Features
+
+#### 🏢 Workspace Support for Task-Master Configuration (High Priority)
+
+Enhance the extension to intelligently detect single-folder repositories vs. multi-root VSCode workspaces. In workspace mode, the UI tree will add repository-level grouping that aggregates and displays all tasks under corresponding repo nodes.
+
+**Key Features:**
+
+- Multi-root workspace detection and configuration lookup
+- Repository-level task aggregation in tree view
+- Workspace-level vs. repo-level configuration precedence
+- Dynamic workspace change handling
+
+#### 🔧 Subtask Management CLI Commands (High Priority)
+
+Develop comprehensive CLI commands for subtask management with optional workspace support.
+
+**Commands:**
+
+- `add-subtask` - Add new subtasks to parent tasks
+- `remove-subtask` - Remove subtasks with optional conversion to standalone tasks
+- `clear-subtasks` - Remove all subtasks from specified or all tasks
+- Workspace-specific operations with `--workspace` parameter
+
+#### 📱 Standardized VSCode Notifications (Low Priority)
+
+Enhance VSCode notifications with consistent loading indicators for long-running operations.
+
+**Improvements:**
+
+- Standardized loading indicators using `window.withProgress` API
+- Consistent notification formatting across all operations
+- Enhanced user feedback for task updates, expansions, and analysis
+- Proper handling of task failures and cancellationsgi
+
 ## Support
 
 - 🐛 [Report Issues](https://github.com/roeyazroel/task-master-vscode-extension/issues)
