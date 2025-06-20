@@ -51,6 +51,14 @@ The Task Master VS Code Extension wraps the Claude Task Master CLI to provide:
 - AI-powered task updates and creation
 - Research-backed task generation
 
+### 📄 PRD Integration
+
+- Right-click context menu for .txt files in VS Code Explorer
+- "Generate Tasks from PRD" option with interactive prompts
+- Configurable task quantity (1-100) and research mode
+- Real-time progress tracking and error handling
+- Automatic task refresh after generation
+
 ## Installation
 
 ### Prerequisites
@@ -74,6 +82,7 @@ The Task Master VS Code Extension wraps the Claude Task Master CLI to provide:
    - Click Install
 
 2. **From Github Artifact**:
+
    - Go for the latest release https://github.com/roeyazroel/task-master-vscode-extension/releases
    - Download the vsix, and install the file
 
@@ -103,11 +112,19 @@ The Task Master VS Code Extension wraps the Claude Task Master CLI to provide:
 
    - Create `.taskmaster/docs/prd.txt` with your project requirements
 
-4. **Generate initial tasks**:
+4. **Generate initial tasks** (choose one method):
+
+   **Option A - CLI:**
 
    ```bash
    task-master parse-prd --input=.taskmaster/docs/prd.txt
    ```
+
+   **Option B - VS Code Extension:**
+
+   - Open VS Code and right-click your PRD `.txt` file in Explorer
+   - Select "Generate Tasks from PRD" from context menu
+   - Follow the interactive prompts
 
 5. **Open VS Code** and enjoy the integrated task management!
 
@@ -124,6 +141,7 @@ Access these commands via `Ctrl+Shift+P` (Windows/Linux) or `Cmd+Shift+P` (Mac):
 - `Task Master: Select Tag` - Switch between tag contexts
 - `Task Master: Analyze Complexity` - Run AI complexity analysis
 - `Task Master: Expand All Tasks` - Break down all tasks into subtasks
+- `Task Master: Generate Tasks from PRD` - Generate tasks from a PRD file
 
 ### Tree View Operations
 
@@ -153,6 +171,31 @@ Click the status bar item to cycle through different views:
 3. **Dependencies** - Ready vs blocked task counts
 4. **Priority** - High/medium/low priority breakdown
 
+### PRD File Integration
+
+The extension provides seamless integration with PRD (Product Requirements Document) files:
+
+**Right-Click Context Menu:**
+
+1. Right-click any `.txt` file in VS Code Explorer
+2. Select "Generate Tasks from PRD" from the context menu
+3. Configure task generation options:
+   - **Task Quantity**: Choose how many tasks to generate (1-100, default: 10)
+   - **Research Mode**: Enable AI research-backed task generation (requires API key)
+4. Monitor real-time progress with built-in progress indicators
+5. View generated tasks automatically refreshed in the task tree
+
+**Features:**
+
+- **Security**: File extension validation and path sanitization
+- **User Experience**: Interactive prompts with validation
+- **Progress Tracking**: Real-time feedback during task generation
+- **Error Handling**: Graceful failure with informative error messages
+- **Integration**: Seamless workflow with existing Task Master features
+
+**Command Palette Alternative:**
+Use `Ctrl+Shift+P` → "Task Master: Generate Tasks from PRD" to select a file manually.
+
 ## Configuration
 
 ### VS Code Settings
@@ -161,7 +204,7 @@ Configure the extension through VS Code settings:
 
 ```json
 {
-  "taskMaster.cliPath": "task-master",
+  "taskMaster.cliPath": "task-master"
 }
 ```
 
