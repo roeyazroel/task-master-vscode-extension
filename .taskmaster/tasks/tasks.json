@@ -509,11 +509,78 @@
             "testStrategy": "Simulate scenarios where the CLI is absent or the version command fails, and verify that the extension displays appropriate error messages and prevents further execution."
           }
         ]
+      },
+      {
+        "id": 20,
+        "title": "Implement Right-Click Context Menu for .txt Files to Trigger parse-prd Command",
+        "description": "Enable a right-click context-menu entry for .txt files directly inside the operating-system File Explorer (e.g., Windows Explorer, Finder, Nautilus) that executes the parse-prd command with specified options.",
+        "status": "done",
+        "dependencies": [
+          17,
+          19
+        ],
+        "priority": "high",
+        "details": "This feature must register a shell / Finder / file-manager extension so that when a user right-clicks any .txt file in their native File Explorer, a menu item labelled “Generate tasks with parse-prd” (or similar) is shown. Selecting that entry must:\n1. Launch the existing parse-prd CLI with the absolute path of the selected file as its first argument.\n2. Accept an optional parameter for the number of tasks to generate (defaulting to 10 if not provided). The UI should prompt the user for this value (e.g., via a small dialog) before invoking the command, or read a default from user settings.\n3. Capture stdout/stderr, surface progress, completion state, and any error messages back to the user (either through a notification toast or a minimal results window).\n\nImplementation notes:\n• Windows: add the context menu by creating a registry entry or packaged COM shell extension.\n• macOS: use a Finder Sync or Quick Actions extension (if support added later).\n• Linux desktop managers: rely on .desktop files or Nautilus/Nemo scripts (future work).\n• All command invocations must be sanitised to avoid command-injection vulnerabilities; escape or quote file paths appropriately.\n\nSecurity: Validate that the selected file really has a .txt extension, that only one file path is passed, and that no additional user-provided arguments are forwarded unchecked.",
+        "testStrategy": "1. In the (native) File Explorer, right-click a .txt file and verify a new context-menu item labelled correctly appears.\n2. Click the item and confirm that parse-prd runs with the selected file path. Use a debugger or log to capture the exact command string.\n3. Execute with and without specifying --num-tasks to verify the default (10) and custom values work.\n4. Confirm UI feedback: progress indicator, success message with results, and graceful error handling if parse-prd fails.\n5. Perform security testing: attempt paths with special characters, spaces, and crafted inputs to ensure no command-injection or privilege-escalation issues.\n6. Regression-test existing CLI behaviour to ensure no breaking changes were introduced.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Research Methods to Add Context Menu Items for .txt Files",
+            "description": "Investigate various approaches to add a right-click context menu option specifically for .txt files in Windows File Explorer.",
+            "dependencies": [],
+            "details": "Explore methods such as modifying the Windows Registry or using package extensions in the application manifest to add context menu items for .txt files.\n<info added on 2025-06-20T12:20:20.385Z>\nAfter investigation, confirmed that context-menu integration should target the VS Code Explorer, not the native OS shell. Use the “explorer/context” contribution point in package.json to add a right-click command for .txt files, ensuring the command appears only within VS Code’s file explorer and aligns with existing Task Master workflows.\n</info added on 2025-06-20T12:20:20.385Z>",
+            "status": "done",
+            "testStrategy": "Verify the feasibility and security implications of each method through documentation review and small-scale testing."
+          },
+          {
+            "id": 2,
+            "title": "Implement Context Menu Option for .txt Files",
+            "description": "Add a right-click context menu option to .txt files that triggers the parse-prd command.",
+            "dependencies": [
+              1
+            ],
+            "details": "Based on the chosen method from the research, implement the context menu option that, when selected, executes the parse-prd command with the selected .txt file as input.",
+            "status": "done",
+            "testStrategy": "Test the context menu option to ensure it appears correctly and triggers the parse-prd command with the correct file path."
+          },
+          {
+            "id": 3,
+            "title": "Modify parse-prd Command to Accept Optional Parameter for Number of Tasks",
+            "description": "Update the parse-prd command to accept an optional parameter specifying the number of tasks to generate, defaulting to 10 if not specified.",
+            "dependencies": [],
+            "details": "Enhance the parse-prd command-line interface to include an optional --num-tasks parameter, allowing users to specify the number of tasks to generate.",
+            "status": "done",
+            "testStrategy": "Test the parse-prd command with and without the --num-tasks parameter to ensure it generates the correct number of tasks."
+          },
+          {
+            "id": 4,
+            "title": "Integrate parse-prd Command Execution with Existing CLI",
+            "description": "Ensure the parse-prd command is executed through the existing command-line interface, handling any output or errors appropriately.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Utilize the existing CLI integration to execute the parse-prd command when the context menu option is selected, capturing and displaying any output or errors.",
+            "status": "done",
+            "testStrategy": "Test the integration by selecting the context menu option and verifying that the parse-prd command executes correctly, with output and errors handled as expected."
+          },
+          {
+            "id": 5,
+            "title": "Update UI to Reflect Command Execution Status and Results",
+            "description": "Modify the user interface to display the status and results of the parse-prd command execution initiated from the context menu.",
+            "dependencies": [
+              4
+            ],
+            "details": "Implement UI elements that provide feedback to the user regarding the execution status and results of the parse-prd command, such as progress indicators and result summaries.",
+            "status": "done",
+            "testStrategy": "Test the UI updates by executing the parse-prd command through the context menu and verifying that the status and results are displayed correctly."
+          }
+        ]
       }
     ],
     "metadata": {
       "created": "2025-06-17T14:01:27.651Z",
-      "updated": "2025-06-19T17:14:09.221Z",
+      "updated": "2025-06-20T12:20:04.170Z",
       "description": "Tasks for master context"
     }
   }

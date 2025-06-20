@@ -508,4 +508,88 @@ export class CLIService extends EventEmitter {
       });
     });
   }
+
+  /**
+   * Execute parse-prd command with specified file and options
+   */
+  public async executeParsePRD(options: {
+    filePath: string;
+    numTasks?: number;
+    force?: boolean;
+    research?: boolean;
+  }): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const args = ["parse-prd"];
+
+      // Add the input file path
+      args.push("--input", options.filePath);
+
+      // Add number of tasks if specified
+      if (options.numTasks) {
+        args.push("--num-tasks", options.numTasks.toString());
+      }
+
+      // Add force flag if specified
+      if (options.force) {
+        args.push("--force");
+      }
+
+      // Add research flag if specified
+      if (options.research) {
+        args.push("--research");
+      }
+
+      const childProcess = spawn(this.config.cliPath, args, {
+        cwd: vscode.workspace.rootPath || process.cwd(),
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+
+      let stdout = "";
+      let stderr = "";
+      const timeout = 300000; // 5 minute timeout for parse-prd
+
+      // Set up timeout
+      const timeoutHandle = setTimeout(() => {
+        childProcess.kill("SIGTERM");
+        reject(new Error(`Parse-PRD command timed out after ${timeout}ms`));
+      }, timeout);
+
+      // Handle stdout data streaming
+      childProcess.stdout?.on("data", (data: Buffer) => {
+        stdout += data.toString();
+        this.emit("outputReceived", data.toString());
+      });
+
+      // Handle stderr
+      childProcess.stderr?.on("data", (data: Buffer) => {
+        stderr += data.toString();
+      });
+
+      // Handle process completion
+      childProcess.on("close", (code: number | null) => {
+        clearTimeout(timeoutHandle);
+
+        if (code === 0) {
+          resolve(stdout);
+        } else {
+          // Include both stderr and stdout in error message for better debugging
+          const errorOutput =
+            stderr.trim() || stdout.trim() || "No error output";
+          reject(
+            new Error(
+              `Parse-PRD command failed with code ${code}: ${errorOutput}`
+            )
+          );
+        }
+      });
+
+      // Handle process errors
+      childProcess.on("error", (error: Error) => {
+        clearTimeout(timeoutHandle);
+        reject(
+          new Error(`Failed to spawn parse-prd CLI process: ${error.message}`)
+        );
+      });
+    });
+  }
 }

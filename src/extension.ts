@@ -590,6 +590,44 @@ function registerCommands(
         }
       }
     ),
+
+    // Parse PRD from File
+    vscode.commands.registerCommand(
+      "taskMaster.parsePRDFromFile",
+      async (uri?: vscode.Uri) => {
+        try {
+          let filePath: string;
+
+          if (uri) {
+            // Called from context menu with file URI
+            filePath = uri.fsPath;
+          } else {
+            // Called from command palette, prompt for file
+            const fileUri = await vscode.window.showOpenDialog({
+              canSelectMany: false,
+              openLabel: "Select PRD File",
+              filters: {
+                "Text files": ["txt"],
+                "All files": ["*"],
+              },
+            });
+
+            if (!fileUri || fileUri.length === 0) {
+              vscode.window.showInformationMessage("No file selected");
+              return;
+            }
+
+            filePath = fileUri[0].fsPath;
+          }
+
+          await taskManagerService.parsePRDFromFile(filePath);
+        } catch (error) {
+          vscode.window.showErrorMessage(
+            `Failed to execute parse-prd: ${error}`
+          );
+        }
+      }
+    ),
   ];
 
   // Add all disposables to context

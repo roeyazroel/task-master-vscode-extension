@@ -2,7 +2,7 @@
   "name": "task-master-vscode-extension",
   "displayName": "Task Master(AI) Extension",
   "description": "VS Code extension for Task Master AI - visualize and manage your AI-assisted tasks",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "razroel",
   "repository": {
     "type": "git",
@@ -183,6 +183,11 @@
       {
         "command": "taskMaster.removeSubtask",
         "title": "Task Master: Remove Subtask"
+      },
+      {
+        "command": "taskMaster.parsePRDFromFile",
+        "title": "Task Master: Generate Tasks from PRD",
+        "icon": "$(file-text)"
       }
     ],
     "menus": {
@@ -291,6 +296,14 @@
           "when": "view == taskMaster.taskView && viewItem =~ /^subtask-/",
           "group": "actions",
           "title": "Remove Subtask"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "taskMaster.parsePRDFromFile",
+          "when": "resourceExtname == .txt",
+          "group": "taskmaster@1",
+          "title": "Generate Tasks from PRD"
         }
       ]
     },

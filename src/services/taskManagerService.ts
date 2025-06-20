@@ -657,4 +657,124 @@ export class TaskManagerService extends EventEmitter {
       await this.refreshTasks();
     });
   }
+
+  /**
+   * Execute parse-prd command on a .txt file with user-specified options
+   */
+  public async parsePRDFromFile(filePath: string): Promise<void> {
+    try {
+      // Validate that the file has a .txt extension
+      if (!filePath.toLowerCase().endsWith(".txt")) {
+        vscode.window.showErrorMessage(
+          "Parse-PRD command only supports .txt files"
+        );
+        return;
+      }
+
+      // Prompt user for number of tasks to generate
+      const numTasksInput = await vscode.window.showInputBox({
+        prompt: "How many tasks should be generated?",
+        value: "10",
+        validateInput: (value) => {
+          const num = parseInt(value, 10);
+          if (isNaN(num) || num < 1 || num > 100) {
+            return "Please enter a number between 1 and 100";
+          }
+          return null;
+        },
+        ignoreFocusOut: true,
+      });
+
+      if (!numTasksInput) {
+        vscode.window.showInformationMessage("Parse-PRD cancelled");
+        return;
+      }
+
+      const numTasks = parseInt(numTasksInput, 10);
+
+      // Show options for research mode
+      const useResearch = await vscode.window.showQuickPick(
+        [
+          {
+            label: "No",
+            value: false,
+            description: "Use standard task generation",
+          },
+          {
+            label: "Yes",
+            value: true,
+            description:
+              "Use research-backed task generation (requires API key)",
+          },
+        ],
+        {
+          placeHolder:
+            "Use research mode for potentially more informed task generation?",
+          ignoreFocusOut: true,
+        }
+      );
+
+      if (!useResearch) {
+        vscode.window.showInformationMessage("Parse-PRD cancelled");
+        return;
+      }
+
+      // Show progress indicator
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Generating tasks from PRD",
+          cancellable: false,
+        },
+        async (progress, token) => {
+          progress.report({ message: "Processing PRD file..." });
+
+          try {
+            const result = await this.cliService.executeParsePRD({
+              filePath: filePath,
+              numTasks: numTasks,
+              research: useResearch.value,
+              force: false, // Don't force overwrite, let user decide if prompted
+            });
+
+            progress.report({ message: "Tasks generated successfully!" });
+
+            // Refresh tasks to show the new ones
+            await this.refreshTasks();
+
+            // Show success message with results
+            vscode.window
+              .showInformationMessage(
+                `Successfully generated tasks from PRD file. Check the task list for new items.`,
+                "View Tasks"
+              )
+              .then((selection) => {
+                if (selection === "View Tasks") {
+                  vscode.commands.executeCommand("taskMaster.refreshTreeView");
+                }
+              });
+
+            // Log the result for debugging
+            log("parsePRD", {
+              filePath,
+              numTasks,
+              research: useResearch.value,
+              result,
+            });
+          } catch (error) {
+            const errorMessage =
+              error instanceof Error ? error.message : "Unknown error";
+            vscode.window.showErrorMessage(
+              `Failed to generate tasks from PRD: ${errorMessage}`
+            );
+            console.error("Parse-PRD error:", error);
+            throw error;
+          }
+        }
+      );
+    } catch (error) {
+      console.error("Failed to execute parse-prd:", error);
+      throw error;
+    }
+  }
 }
