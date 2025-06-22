@@ -9,13 +9,16 @@ export class ConfigService {
   private static readonly CONFIG_SECTION = "taskMaster";
 
   /**
-   * Get current configuration from VS Code settings
+   * Get current configuration from VS Code settings for a specific scope.
+   * @param scopeUri Optional URI for the scope (e.g., workspace folder).
    */
-  public static getConfig(): TaskMasterConfig {
-    const config = vscode.workspace.getConfiguration(this.CONFIG_SECTION);
+  public static getConfig(scopeUri?: string): TaskMasterConfig {
+    const scope = scopeUri ? vscode.Uri.parse(scopeUri) : undefined;
+    const config = vscode.workspace.getConfiguration(this.CONFIG_SECTION, scope);
 
     return {
       cliPath: config.get<string>("cliPath") || "task-master",
+      // Add other config properties here if any
     };
   }
 
@@ -24,10 +27,17 @@ export class ConfigService {
    */
   public static async updateConfig(
     key: keyof TaskMasterConfig,
-    value: any
+    value: any,
+    target: vscode.ConfigurationTarget = vscode.ConfigurationTarget.Workspace,
+    scopeUri?: vscode.Uri
   ): Promise<void> {
-    const config = vscode.workspace.getConfiguration(this.CONFIG_SECTION);
-    await config.update(key, value, vscode.ConfigurationTarget.Workspace);
+    // When setting WorkspaceFolder configuration, the scopeUri must be provided.
+    // For Global or Workspace, scopeUri should be undefined.
+    const config = vscode.workspace.getConfiguration(
+      this.CONFIG_SECTION,
+      target === vscode.ConfigurationTarget.WorkspaceFolder ? scopeUri : undefined
+    );
+    await config.update(key, value, target);
   }
 
   /**
@@ -70,23 +80,41 @@ export class ConfigService {
   }
 
   /**
-   * Get workspace-specific CLI path (check node_modules first)
+   * Get workspace-specific CLI path (check node_modules first) for a given workspace folder.
+   * @param workspaceFolderUri Optional URI of the workspace folder.
    */
-  public static getWorkspaceCliPath(): string {
-    const workspaceRoot = vscode.workspace.rootPath;
-    if (workspaceRoot) {
-      const localCliPath = `${workspaceRoot}/node_modules/.bin/task-master`;
+  public static getWorkspaceCliPath(workspaceFolderUri?: string): string {
+    let folderPath: string | undefined;
+    if (workspaceFolderUri) {
+      folderPath = vscode.Uri.parse(workspaceFolderUri).fsPath;
+    } else if (
+      vscode.workspace.workspaceFolders &&
+      vscode.workspace.workspaceFolders.length > 0
+    ) {
+      folderPath = vscode.workspace.workspaceFolders[0].uri.fsPath; // Fallback to first folder
+    }
+
+    if (folderPath) {
+      const localCliPath = path.join(
+        folderPath,
+        "node_modules",
+        ".bin",
+        "task-master"
+      );
       return localCliPath;
     }
-    return "task-master";
+    return "task-master"; // Default if no folder context
   }
 
   /**
-   * Auto-detect and suggest CLI path
+   * Auto-detect and suggest CLI path, prioritizing the given workspace folder.
+   * @param workspaceFolderUri Optional URI of the workspace folder to check first.
    */
-  public static async autoDetectCliPath(): Promise<string> {
-    // Try workspace local first
-    const workspacePath = this.getWorkspaceCliPath();
+  public static async autoDetectCliPath(
+    workspaceFolderUri?: string
+  ): Promise<string> {
+    // Try workspace local first for the given folder
+    const workspacePath = this.getWorkspaceCliPath(workspaceFolderUri);
     if (await this.validateCliPath(workspacePath)) {
       return workspacePath;
     }

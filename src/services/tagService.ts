@@ -13,25 +13,52 @@ import { ConfigService } from "./configService";
  */
 export class TagService extends EventEmitter {
   private cliService: CLIService;
-  private currentTag: string = "master";
+  private currentTag: string = "master"; // Default, will be updated from config
   private taskMasterRoot: string;
+  private workspaceFolderUri: string;
 
-  constructor() {
+  constructor(workspaceFolderUri: string) {
     super();
-    const config = ConfigService.getConfig();
-    this.cliService = new CLIService(config);
-    this.taskMasterRoot = this.findTaskMasterRoot();
+    if (!workspaceFolderUri) {
+      throw new Error(
+        "TagService requires a workspaceFolderUri upon construction."
+      );
+    }
+    this.workspaceFolderUri = workspaceFolderUri;
+    // TODO: ConfigService.getConfig() might need to accept workspaceFolderUri
+    // For now, assuming it provides a general config, CLIService might need folder-specific later.
+    const config = ConfigService.getConfig(this.workspaceFolderUri);
+    this.cliService = new CLIService(config, this.workspaceFolderUri);
+    this.taskMasterRoot = this.findTaskMasterRoot(this.workspaceFolderUri);
+
+    // Initialize currentTag by reading from config asynchronously
+    this.initializeCurrentTag();
+  }
+
+  private async initializeCurrentTag(): Promise<void> {
+    try {
+      this.currentTag = await this.getCurrentTagFromConfig();
+    } catch (error) {
+      console.error(
+        `Error initializing current tag for ${this.workspaceFolderUri}:`,
+        error
+      );
+      // Keep default 'master' or handle error as appropriate
+    }
   }
 
   /**
-   * Find the .taskmaster directory in the workspace
+   * Find the .taskmaster directory in the specified workspace folder.
+   * @param workspaceFolderUri URI of the workspace folder.
    */
-  private findTaskMasterRoot(): string {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!workspaceFolder) {
-      throw new Error("No workspace folder found");
+  private findTaskMasterRoot(workspaceFolderUri: string): string {
+    const folderPath = vscode.Uri.parse(workspaceFolderUri).fsPath;
+    if (!folderPath) {
+      throw new Error(
+        `Invalid workspace folder URI: ${workspaceFolderUri}`
+      );
     }
-    const taskMasterPath = path.join(workspaceFolder, ".taskmaster");
+    const taskMasterPath = path.join(folderPath, ".taskmaster");
     return taskMasterPath;
   }
 

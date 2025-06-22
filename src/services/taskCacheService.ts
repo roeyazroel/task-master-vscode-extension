@@ -20,54 +20,83 @@ import { TagService } from "./tagService";
 
 /**
  * Service for managing task caching and file reading operations
- * Enhanced with tag functionality
+ * Enhanced with tag functionality, supporting multi-root workspaces.
  */
 export class TaskCacheService extends EventEmitter {
-  private cachedTasks: Task[] = [];
-  private cachedResponse: TaskMasterResponse | null = null;
-  private tagService: TagService;
+  private cachedTasksPerFolder: Map<string, Task[]> = new Map();
+  private cachedResponsePerFolder: Map<string, TaskMasterResponse | null> =
+    new Map();
+  private tagServicePerFolder: Map<string, TagService> = new Map();
 
   constructor() {
     super();
-    this.tagService = new TagService();
-    this.setupTagServiceEventHandlers();
+    // Initialization of TagService instances will be done on-demand
+    // when a workspace folder is first accessed.
   }
 
   /**
-   * Setup event handlers for tag service
+   * Get or create a TagService instance for a given workspace folder.
+   * @param workspaceFolderUri The URI of the workspace folder.
    */
-  private setupTagServiceEventHandlers(): void {
-    this.tagService.on("currentTagChanged", async ({ oldTag, newTag }) => {
-      // Refresh tasks when tag changes
-      await this.refreshTasksFromFile();
-      this.emit("currentTagChanged", { oldTag, newTag });
-    });
-
-    this.tagService.on("tagError", (error) => {
-      this.emit("tagError", error);
-    });
-
-    this.tagService.on("tagsUpdated", (tags) => {
-      this.emit("tagsUpdated", tags);
-    });
+  private getTagService(workspaceFolderUri: string): TagService {
+    if (!this.tagServicePerFolder.has(workspaceFolderUri)) {
+      const newTagService = new TagService(workspaceFolderUri);
+      this.tagServicePerFolder.set(workspaceFolderUri, newTagService);
+      this.setupTagServiceEventHandlers(newTagService, workspaceFolderUri);
+    }
+    return this.tagServicePerFolder.get(workspaceFolderUri)!;
   }
 
   /**
-   * Read tasks directly from the tasks.json file
+   * Setup event handlers for a specific tag service instance.
+   * @param tagService The TagService instance.
+   * @param workspaceFolderUri The URI of the workspace folder for context.
    */
-  public async refreshTasksFromFile(): Promise<TaskMasterResponse | null> {
-    try {
-      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (!workspaceRoot) {
-        throw new Error("No workspace open");
+  private setupTagServiceEventHandlers(
+    tagService: TagService,
+    workspaceFolderUri: string
+  ): void {
+    tagService.on(
+      "currentTagChanged",
+      async ({ oldTag, newTag }: { oldTag: string; newTag: string }) => {
+        // Refresh tasks when tag changes for this specific folder
+        await this.refreshTasksFromFile(workspaceFolderUri);
+        this.emit("currentTagChanged", {
+          oldTag,
+          newTag,
+          workspaceFolderUri,
+        });
       }
+    );
+
+    tagService.on("tagError", (error: Error) => {
+      this.emit("tagError", { error, workspaceFolderUri });
+    });
+
+    tagService.on("tagsUpdated", (tags: TagInfo[]) => {
+      this.emit("tagsUpdated", { tags, workspaceFolderUri });
+    });
+  }
+
+  /**
+   * Read tasks directly from the tasks.json file for a specific workspace folder.
+   * @param workspaceFolderUri The URI of the workspace folder.
+   */
+  public async refreshTasksFromFile(
+    workspaceFolderUri: string
+  ): Promise<TaskMasterResponse | null> {
+    try {
+      if (!workspaceFolderUri) {
+        throw new Error("Workspace folder URI not provided");
+      }
+      const tagService = this.getTagService(workspaceFolderUri);
 
       // Use TagService to get current tag info (uses CLI)
-      const tagInfo = await this.tagService.getCurrentTagInfo();
+      const tagInfo = await tagService.getCurrentTagInfo();
       const currentTag = tagInfo.currentTag;
 
       // Get tasks for current tag using TagService (uses CLI with caching)
-      const tasks = await this.tagService.getTasksByTag(currentTag);
+      const tasks = await tagService.getTasksByTag(currentTag);
 
       // Fix string dependencies (workaround for CLI bug)
       const fixedTasks = fixStringDependencies(tasks);
@@ -214,10 +243,25 @@ export class TaskCacheService extends EventEmitter {
   }
 
   /**
-   * Clear cached data including tag cache
+   * Clear cached data for a specific folder or all folders.
+   * @param workspaceFolderUri If provided, clears cache only for this folder. Otherwise, clears all.
    */
-  public clearCache(): void {
-    this.cachedTasks = [];
-    this.cachedResponse = null;
+  public clearCache(workspaceFolderUri?: string): void {
+    if (workspaceFolderUri) {
+      this.cachedTasksPerFolder.delete(workspaceFolderUri);
+      this.cachedResponsePerFolder.delete(workspaceFolderUri);
+      const tagService = this.tagServicePerFolder.get(workspaceFolderUri);
+      if (tagService) {
+        // If TagService had its own cache or disposables, call them here.
+        // For now, just removing it from map.
+        this.tagServicePerFolder.delete(workspaceFolderUri);
+      }
+    } else {
+      this.cachedTasksPerFolder.clear();
+      this.cachedResponsePerFolder.clear();
+      // Dispose all managed TagService instances if they have disposables.
+      this.tagServicePerFolder.forEach(service => { /* service.dispose() if it exists */ });
+      this.tagServicePerFolder.clear();
+    }
   }
 }

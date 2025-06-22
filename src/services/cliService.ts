@@ -21,10 +21,32 @@ export class CLIService extends EventEmitter {
   private config: TaskMasterConfig;
   private lastRefreshTime: number = 0;
   private isExecuting: boolean = false;
+  private workspaceFolderFsPath: string;
 
-  constructor(config: TaskMasterConfig) {
+  constructor(config: TaskMasterConfig, workspaceFolderUri?: string) {
     super();
     this.config = config;
+
+    if (workspaceFolderUri) {
+      this.workspaceFolderFsPath = vscode.Uri.parse(workspaceFolderUri).fsPath;
+    } else if (
+      vscode.workspace.workspaceFolders &&
+      vscode.workspace.workspaceFolders.length > 0
+    ) {
+      // Fallback to the first workspace folder if no specific URI is provided
+      this.workspaceFolderFsPath =
+        vscode.workspace.workspaceFolders[0].uri.fsPath;
+      console.warn(
+        `CLIService initialized without specific workspaceFolderUri, falling back to ${this.workspaceFolderFsPath}`
+      );
+    } else {
+      // If no workspace is open, CLI commands might operate globally or fail.
+      // Setting to process.cwd() as a last resort.
+      this.workspaceFolderFsPath = process.cwd();
+      console.warn(
+        "CLIService initialized without a workspace folder, using process.cwd(). Some commands may not work as expected."
+      );
+    }
   }
 
   /**
@@ -86,14 +108,16 @@ export class CLIService extends EventEmitter {
     options: CLIExecutionOptions = {}
   ): Promise<TaskMasterResponse | null> {
     try {
-      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (!workspaceRoot) {
-        console.log("No workspace root found, cannot read tasks file");
+      // Use the class member workspaceFolderFsPath
+      if (!this.workspaceFolderFsPath) {
+        console.log(
+          "Workspace folder path not set in CLIService, cannot read tasks file"
+        );
         return null;
       }
 
       const tasksFilePath = path.join(
-        workspaceRoot,
+        this.workspaceFolderFsPath,
         ".taskmaster",
         "tasks",
         "tasks.json"
@@ -283,7 +307,7 @@ export class CLIService extends EventEmitter {
     return new Promise((resolve, reject) => {
       const args = this.buildCommandArgs(command, options);
       const childProcess = spawn(this.config.cliPath, args, {
-        cwd: vscode.workspace.rootPath || process.cwd(),
+        cwd: this.workspaceFolderFsPath || process.cwd(), // Use specific folder or fallback
         stdio: ["ignore", "pipe", "pipe"],
       });
 
@@ -460,7 +484,7 @@ export class CLIService extends EventEmitter {
     return new Promise((resolve, reject) => {
       const args = ["next"];
       const childProcess = spawn(this.config.cliPath, args, {
-        cwd: vscode.workspace.rootPath || process.cwd(),
+        cwd: this.workspaceFolderFsPath || process.cwd(), // Use specific folder or fallback
         stdio: ["ignore", "pipe", "pipe"],
       });
 
@@ -540,7 +564,7 @@ export class CLIService extends EventEmitter {
       }
 
       const childProcess = spawn(this.config.cliPath, args, {
-        cwd: vscode.workspace.rootPath || process.cwd(),
+        cwd: this.workspaceFolderFsPath || process.cwd(), // Use specific folder or fallback
         stdio: ["ignore", "pipe", "pipe"],
       });
 

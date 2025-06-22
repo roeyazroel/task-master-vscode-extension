@@ -6,24 +6,32 @@ import * as vscode from "vscode";
  */
 
 /**
- * Setup file system watchers for tasks and complexity files
+ * Setup file system watchers for tasks and complexity files for a specific workspace folder.
+ * @param workspaceFolderUri The URI of the workspace folder.
+ * @param onRefreshTasks Callback to trigger when a relevant file changes.
  */
-export async function setupFileWatchers(
-  eventEmitter: EventEmitter,
-  onRefreshTasks: () => Promise<void>
+export async function setupFileWatchersForFolder(
+  workspaceFolderUri: string,
+  onRefreshTasks: (uri: string) => Promise<void> // Pass URI to callback
 ): Promise<{
   tasksFileWatcher?: vscode.FileSystemWatcher;
   complexityFileWatcher?: vscode.FileSystemWatcher;
 }> {
-  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (!workspaceRoot) {
-    console.warn("No workspace open, cannot setup file watchers");
+  const folderPath = vscode.Uri.parse(workspaceFolderUri).fsPath;
+  if (!folderPath) {
+    console.warn(
+      `Invalid workspace folder URI ${workspaceFolderUri}, cannot setup file watchers.`
+    );
     return {};
   }
 
+  // Check if .taskmaster directory exists
+  // TODO: This check might be better placed in TaskManagerService before calling this.
+  // For now, assume we only call this for folders known to have .taskmaster.
+
   // Setup tasks file watcher
   const tasksFilePattern = new vscode.RelativePattern(
-    workspaceRoot,
+    vscode.Uri.parse(workspaceFolderUri), // Use Uri object for RelativePattern
     ".taskmaster/tasks/tasks.json"
   );
 
@@ -35,18 +43,22 @@ export async function setupFileWatchers(
   );
 
   tasksFileWatcher.onDidCreate(() => {
-    console.log("Tasks file created, refreshing...");
-    onRefreshTasks();
+    console.log(
+      `Tasks file created in ${workspaceFolderUri}, refreshing...`
+    );
+    onRefreshTasks(workspaceFolderUri);
   });
 
   tasksFileWatcher.onDidChange(() => {
-    console.log("Tasks file changed, refreshing...");
-    onRefreshTasks();
+    console.log(
+      `Tasks file changed in ${workspaceFolderUri}, refreshing...`
+    );
+    onRefreshTasks(workspaceFolderUri);
   });
 
   // Setup complexity file watcher
   const complexityFilePattern = new vscode.RelativePattern(
-    workspaceRoot,
+    vscode.Uri.parse(workspaceFolderUri), // Use Uri object
     ".taskmaster/reports/task-complexity-report.json"
   );
 
@@ -58,16 +70,22 @@ export async function setupFileWatchers(
   );
 
   complexityFileWatcher.onDidCreate(() => {
-    console.log("Complexity report created, refreshing...");
-    onRefreshTasks();
+    console.log(
+      `Complexity report created in ${workspaceFolderUri}, refreshing...`
+    );
+    onRefreshTasks(workspaceFolderUri);
   });
 
   complexityFileWatcher.onDidChange(() => {
-    console.log("Complexity report changed, refreshing...");
-    onRefreshTasks();
+    console.log(
+      `Complexity report changed in ${workspaceFolderUri}, refreshing...`
+    );
+    onRefreshTasks(workspaceFolderUri);
   });
 
-  console.log("File watchers setup for tasks and complexity files");
+  console.log(
+    `File watchers setup for tasks and complexity files in ${workspaceFolderUri}`
+  );
 
   return {
     tasksFileWatcher,

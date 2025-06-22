@@ -16,13 +16,18 @@ let tagCommands: TagCommands;
  * Helper function to extract task ID from different invocation sources
  */
 function extractTaskId(
-  taskIdOrTreeItem?: number | TaskTreeItem,
+  taskIdOrTreeItem?: number | TaskTreeItem, // TaskTreeItem now has workspaceFolder
   taskId?: number
 ): number | undefined {
   if (typeof taskIdOrTreeItem === "number") {
     return taskIdOrTreeItem;
-  } else if (taskIdOrTreeItem && "task" in taskIdOrTreeItem) {
-    return Number(taskIdOrTreeItem.task?.id);
+  } else if (
+    taskIdOrTreeItem &&
+    typeof taskIdOrTreeItem === "object" && // Make sure it's an object
+    "task" in taskIdOrTreeItem &&
+    taskIdOrTreeItem.task // Make sure task is not null
+  ) {
+    return Number(taskIdOrTreeItem.task.id);
   } else if (taskId) {
     return taskId;
   }
@@ -34,12 +39,95 @@ function extractTaskId(
  * Returns the full format "parentId.subtaskId" as expected by the CLI
  */
 function extractSubtaskId(taskTreeItem?: TaskTreeItem): string | undefined {
-  if (taskTreeItem && taskTreeItem.isSubtask && taskTreeItem.subtask) {
+  if (
+    taskTreeItem &&
+    typeof taskTreeItem === "object" && // Ensure it's an object
+    taskTreeItem.isSubtask &&
+    taskTreeItem.subtask // Ensure subtask is not null
+  ) {
     const parentId = taskTreeItem.subtask.parentId;
     const subtaskId = taskTreeItem.subtask.id;
     return `${parentId}.${subtaskId}`;
   }
   return undefined;
+}
+
+/**
+ * Helper function to get the workspace folder URI for a command.
+ * - If invoked from a tree item with workspaceFolder, uses that.
+ * - Otherwise, if multiple managed TaskMaster projects, prompts user to pick one.
+ * - If only one managed TaskMaster project, uses that.
+ * - Returns undefined if no suitable folder can be determined.
+ * @param item The first argument from the command, possibly a TreeItem.
+ */
+async function getWorkspaceFolderUriForCommand(
+  item?: TaskTreeItem | RepositoryTreeItem | any
+): Promise<string | undefined> {
+  if (
+    item &&
+    typeof item === "object" &&
+    "workspaceFolder" in item &&
+    item.workspaceFolder &&
+    "uri" in item.workspaceFolder
+  ) {
+    return item.workspaceFolder.uri.toString();
+  }
+
+  // Access managedWorkspaceFolderUris from taskManagerService
+  // This requires taskManagerService to be accessible here, or this logic moved,
+  // or taskManagerService exposing a method to get these URIs.
+  // For now, let's assume taskManagerService.getManagedFolderUris() exists.
+  // This needs to be added to TaskManagerService.
+  const managedUris = taskManagerService.getManagedFolderUris
+    ? taskManagerService.getManagedFolderUris() // Assume this method returns string[]
+    : [];
+
+  if (managedUris.length === 0) {
+    vscode.window.showWarningMessage(
+      "No TaskMaster projects found in the current workspace."
+    );
+    return undefined;
+  }
+
+  if (managedUris.length === 1) {
+    return managedUris[0];
+  }
+
+  // Prompt user to pick a folder
+  const workspaceFolders = vscode.workspace.workspaceFolders || [];
+  const managedWorkspaceFolders = workspaceFolders.filter((wf) =>
+    managedUris.includes(wf.uri.toString())
+  );
+
+  if (managedWorkspaceFolders.length === 0) {
+    // Should not happen if managedUris is not empty
+    return undefined;
+  }
+
+  if (managedWorkspaceFolders.length === 1) { // Possible if managedUris had one, but it wasn't in current workspaceFolders (unlikely)
+      return managedWorkspaceFolders[0].uri.toString();
+  }
+
+
+  const pickedFolder = await vscode.window.showWorkspaceFolderPick({
+    placeHolder: "Select the TaskMaster project for this command",
+    ignoreFocusOut: true,
+    canPickMany: false,
+    // Filter to only show managed TaskMaster projects
+    // showWorkspaceFolderPick doesn't have a direct filter, so we show them all
+    // and should validate the pick if needed, or rely on managedUris.
+    // Better: Create QuickPick from managedWorkspaceFolders directly.
+  });
+
+  // Temporary: Using showQuickPick for managed folders
+  const quickPickItems = managedWorkspaceFolders.map(wf => ({ label: wf.name, uri: wf.uri.toString() }));
+  const pickedItem = await vscode.window.showQuickPick(quickPickItems, {
+      placeHolder: "Select the TaskMaster project for this command",
+      ignoreFocusOut: true,
+  });
+
+
+  return pickedItem?.uri;
 }
 
 /**
@@ -163,6 +251,8 @@ async function initializeExtensionServices(
 
   // Initialize Task Tree Provider
   taskTreeProvider = new TaskTreeProvider();
+  // TODO: Refactor to constructor injection if time permits
+  taskTreeProvider.setTaskManagerService(taskManagerService);
 
   // Initialize Tag Commands
   tagCommands = TagCommands.registerCommands(context, taskManagerService);
@@ -192,28 +282,56 @@ function registerCommands(
 ): void {
   // Register commands with actual functionality
   const disposables = [
-    vscode.commands.registerCommand("taskMaster.refreshTasks", async () => {
-      try {
-        await taskManagerService.refreshTasks();
-        vscode.window.showInformationMessage("Tasks refreshed successfully");
-      } catch (error) {
-        vscode.window.showErrorMessage(`Failed to refresh tasks: ${error}`);
+    // Updated refreshTasks to handle multi-folder
+    vscode.commands.registerCommand(
+      "taskMaster.refreshTasks",
+      async (item?: RepositoryTreeItem | any) => {
+        const folderUri = await getWorkspaceFolderUriForCommand(item);
+        if (folderUri) {
+          try {
+            await taskManagerService.refreshTasks(folderUri);
+            vscode.window.showInformationMessage(
+              `Tasks refreshed successfully for ${
+                vscode.workspace.getWorkspaceFolder(vscode.Uri.parse(folderUri))
+                  ?.name
+              }.`
+            );
+          } catch (error) {
+            vscode.window.showErrorMessage(
+              `Failed to refresh tasks for ${
+                vscode.workspace.getWorkspaceFolder(vscode.Uri.parse(folderUri))
+                  ?.name
+              }: ${error}`
+            );
+          }
+        } else if (taskManagerService.getManagedFolderUris().length > 0 && !item) {
+          // If no specific folder (e.g. from palette) and multiple managed folders exist,
+          // User would have been prompted by getWorkspaceFolderUriForCommand.
+          // If they cancel, folderUri is undefined.
+          // If only one managed folder, it's used automatically.
+          // If zero managed folders, getWorkspaceFolderUriForCommand shows a message.
+        } else if (taskManagerService.getManagedFolderUris().length === 0) {
+          // This case is already handled by getWorkspaceFolderUriForCommand's warning.
+        }
       }
-    }),
+    ),
 
-    vscode.commands.registerCommand("taskMaster.showNextTask", async () => {
+    vscode.commands.registerCommand("taskMaster.showNextTask", async (item?: TaskTreeItem | RepositoryTreeItem | any) => {
+      const folderUri = await getWorkspaceFolderUriForCommand(item);
+      if (!folderUri) return;
+
       try {
-        const nextTask = await taskManagerService.getNextTask();
+        const nextTask = await taskManagerService.getNextTask(folderUri); // Pass folderUri
         if (nextTask) {
-          log("nextTask", nextTask);
+          log("nextTask for " + folderUri, nextTask);
           vscode.window.showInformationMessage(
-            `Next task: ${nextTask.title} (ID: ${nextTask.id})`
+            `Next task in ${vscode.workspace.getWorkspaceFolder(vscode.Uri.parse(folderUri))?.name}: ${nextTask.title} (ID: ${nextTask.id})`
           );
         } else {
-          vscode.window.showInformationMessage("No next task available");
+          vscode.window.showInformationMessage(`No next task available in ${vscode.workspace.getWorkspaceFolder(vscode.Uri.parse(folderUri))?.name}`);
         }
       } catch (error) {
-        vscode.window.showErrorMessage(`Failed to get next task: ${error}`);
+        vscode.window.showErrorMessage(`Failed to get next task for ${vscode.workspace.getWorkspaceFolder(vscode.Uri.parse(folderUri))?.name}: ${error}`);
       }
     }),
 
@@ -258,21 +376,64 @@ function registerCommands(
 
     vscode.commands.registerCommand(
       "taskMaster.markComplete",
-      async (taskIdOrTreeItem?: number | TaskTreeItem, taskId?: number) => {
-        const actualTaskId = extractTaskId(taskIdOrTreeItem, taskId);
+      async (
+        taskIdOrTreeItem?: number | TaskTreeItem,
+        taskIdFromPalette?: number // Renamed to avoid clash if first arg is number
+      ) => {
+        // Determine context and task ID
+        let actualTaskId: number | undefined;
+        let folderUri: string | undefined;
 
-        if (actualTaskId) {
-          try {
-            await taskManagerService.executeTaskCommand(
-              "set-status",
-              actualTaskId,
-              "done"
-            );
-          } catch (error) {
-            vscode.window.showErrorMessage(`Error completing task: ${error}`);
+        if (typeof taskIdOrTreeItem === "object" && taskIdOrTreeItem?.task) {
+          // Invoked from TreeItem
+          actualTaskId = Number(taskIdOrTreeItem.task.id);
+          if (taskIdOrTreeItem.workspaceFolder) {
+            folderUri = taskIdOrTreeItem.workspaceFolder.uri.toString();
+          } else {
+             // Try to infer from a global context if only one project, or prompt.
+            folderUri = await getWorkspaceFolderUriForCommand(undefined);
           }
+        } else if (typeof taskIdOrTreeItem === "number") {
+          // Invoked with a number directly (e.g. from another command, or if palette passed number)
+          actualTaskId = taskIdOrTreeItem;
+          folderUri = await getWorkspaceFolderUriForCommand(undefined); // Prompt if ambiguous
+        } else if (taskIdFromPalette) {
+          // Fallback if first arg was not useful, but second was.
+          actualTaskId = taskIdFromPalette;
+          folderUri = await getWorkspaceFolderUriForCommand(undefined);
         } else {
-          vscode.window.showWarningMessage("No task ID provided");
+            // Attempt to get folder URI even if task ID is missing, to show a targeted error
+            folderUri = await getWorkspaceFolderUriForCommand(taskIdOrTreeItem instanceof vscode.TreeItem ? taskIdOrTreeItem : undefined);
+        }
+
+
+        if (!folderUri) {
+          if (taskManagerService.getManagedFolderUris().length > 0) {
+            vscode.window.showWarningMessage("Could not determine project folder for the command.");
+          } // If 0 managed folders, getWorkspaceFolderUriForCommand already warned.
+          return;
+        }
+
+        if (!actualTaskId) {
+            vscode.window.showWarningMessage("No task ID provided or found.");
+            return;
+        }
+
+        try {
+          await taskManagerService.executeTaskCommand(
+            folderUri, // Pass folderUri
+            "set-status",
+            actualTaskId,
+            "done"
+          );
+          // Success message will be shown by TaskManagerService or by tree refresh.
+        } catch (error) {
+          vscode.window.showErrorMessage(
+            `Error completing task in ${
+              vscode.workspace.getWorkspaceFolder(vscode.Uri.parse(folderUri))
+                ?.name
+            }: ${error}`
+          );
         }
       }
     ),
@@ -661,8 +822,19 @@ function registerCommands(
 
   // Initialize Task Manager Service and start polling
   taskManagerService.initialize().then(() => {
-    console.log("Task Manager Service initialized");
+    console.log("Task Manager Service initialized after folder processing.");
   });
+
+  // Listen for workspace folder changes
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeWorkspaceFolders(async (event) => {
+      console.log("Workspace folders changed:", event);
+      // Re-initialize TaskManagerService to discover new/removed TaskMaster projects
+      await taskManagerService.initialize();
+      // Refresh the entire tree view
+      taskTreeProvider.refresh(); // Global refresh
+    })
+  );
 
   console.log("Task Master extension activated successfully");
 }
@@ -674,55 +846,92 @@ function setupEventHandlers(
   context: vscode.ExtensionContext,
   treeView: vscode.TreeView<any>
 ) {
-  // Handle task updates
-  taskManagerService.on("tasksUpdated", async (tasks) => {
-    taskTreeProvider.updateTasks(tasks);
+  // Handle task updates (now per-folder)
+  taskManagerService.on(
+    "tasksUpdated",
+    async (payload: { tasks: any[]; workspaceFolderUri: string }) => {
+      taskTreeProvider.handleTasksUpdated(
+        payload.workspaceFolderUri,
+        payload.tasks
+      );
+      // Current/Next task updates are also now part of specific folder refresh logic
+      // or separate events if needed. TaskTreeProvider.refresh(uri) should handle it.
+    }
+  );
 
-    // Also update current and next task information
-    const currentTask = taskManagerService.getCurrentTask();
-    const nextTask = await taskManagerService.getNextTask();
-    taskTreeProvider.updateCurrentAndNextTasks(currentTask, nextTask);
-  });
+  // Handle tag changes (now per-folder)
+  taskManagerService.on(
+    "currentTagChanged",
+    async (payload: {
+      oldTag: string;
+      newTag: string;
+      workspaceFolderUri: string;
+    }) => {
+      console.log(
+        `Tag changed from ${payload.oldTag} to ${payload.newTag} in ${payload.workspaceFolderUri}`
+      );
 
-  // Handle tag changes - refresh everything
-  taskManagerService.on("currentTagChanged", async ({ oldTag, newTag }) => {
-    console.log(`Tag changed from ${oldTag} to ${newTag}`);
+      // Refresh the specific folder in the tree view
+      taskTreeProvider.refresh(payload.workspaceFolderUri);
 
-    // Refresh tree view to show tasks for new tag
-    taskTreeProvider.refresh();
+      // Status bar might need to be smarter or reflect a primary/active folder
+      statusBarService.refresh(); // This refresh might need context too eventually
 
-    // Update current and next task information after tag change
-    const currentTask = taskManagerService.getCurrentTask();
-    const nextTask = await taskManagerService.getNextTask();
-    taskTreeProvider.updateCurrentAndNextTasks(currentTask, nextTask);
+      vscode.window.showInformationMessage(
+        `Switched to tag: ${payload.newTag} for folder ${
+          vscode.workspace.getWorkspaceFolder(
+            vscode.Uri.parse(payload.workspaceFolderUri)
+          )?.name
+        }`
+      );
+    }
+  );
 
-    // Update status bar
-    statusBarService.refresh();
+  // Handle tag errors (now per-folder)
+  taskManagerService.on(
+    "tagError",
+    (payload: { error: any; workspaceFolderUri: string }) => {
+      console.error(`Tag error in ${payload.workspaceFolderUri}:`, payload.error);
+      vscode.window.showErrorMessage(
+        `Tag operation failed in ${
+          vscode.workspace.getWorkspaceFolder(
+            vscode.Uri.parse(payload.workspaceFolderUri)
+          )?.name
+        }: ${payload.error}`
+      );
+    }
+  );
 
-    // Show notification
-    vscode.window.showInformationMessage(`Switched to tag: ${newTag}`);
-  });
+  // Handle CLI availability (now per-folder)
+  taskManagerService.on(
+    "cliNotAvailable",
+    (payload: { workspaceFolderUri: string }) => {
+      vscode.window.showWarningMessage(
+        `Task Master CLI not available for ${
+          vscode.workspace.getWorkspaceFolder(
+            vscode.Uri.parse(payload.workspaceFolderUri)
+          )?.name
+        }. Some features may be limited.`
+      );
+    }
+  );
 
-  // Handle tag errors
-  taskManagerService.on("tagError", (error) => {
-    console.error("Tag error:", error);
-    vscode.window.showErrorMessage(`Tag operation failed: ${error}`);
-  });
-
-  // Handle CLI availability
-  taskManagerService.on("cliNotAvailable", () => {
-    vscode.window.showWarningMessage(
-      "Task Master CLI is not available. Some features may be limited."
-    );
-  });
-
-  // Handle initialization errors
-  taskManagerService.on("initializationError", (error) => {
-    console.error("Task Manager initialization error:", error);
-    vscode.window.showErrorMessage(
-      `Failed to initialize Task Master: ${error}`
-    );
-  });
+  // Handle initialization errors (can be global or per-folder)
+  taskManagerService.on(
+    "initializationError",
+    (payload: { error: any; workspaceFolderUri?: string }) => {
+      let message = "Failed to initialize Task Master";
+      if (payload.workspaceFolderUri) {
+        message += ` for folder ${
+          vscode.workspace.getWorkspaceFolder(
+            vscode.Uri.parse(payload.workspaceFolderUri)
+          )?.name
+        }`;
+      }
+      console.error(`${message}:`, payload.error);
+      vscode.window.showErrorMessage(`${message}: ${payload.error}`);
+    }
+  );
 }
 
 /**

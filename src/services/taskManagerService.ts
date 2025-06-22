@@ -29,96 +29,166 @@ import { TaskOperationsService } from "./taskOperationsService";
  * Orchestrates CLI operations, caching, and event handling with tag filtering
  */
 export class TaskManagerService extends EventEmitter {
-  private cliService: CLIService;
-  private configService: ConfigService;
+  // No single cliService instance here. Scoped instances will be created as needed or managed.
+  private configService: typeof ConfigService; // Static class
   private taskCacheService: TaskCacheService;
   private taskOperationsService: TaskOperationsService;
-  private cliManagementService: CLIManagementService;
+  private cliManagementService: CLIManagementService; // May also need context awareness if it runs CLI commands
   private fileWatcherService: FileWatcherService;
   private configChangeListener?: vscode.Disposable;
   private isInitialized: boolean = false;
 
+  // To keep track of which folders have .taskmaster and are being managed
+  private managedWorkspaceFolderUris: Set<string> = new Set();
+
   constructor() {
     super();
-    const config = ConfigService.getConfig();
-    this.cliService = new CLIService(config);
+    // ConfigService is static, no instantiation.
     this.configService = ConfigService;
-    this.taskCacheService = new TaskCacheService();
-    this.taskOperationsService = new TaskOperationsService(this.cliService);
-    this.cliManagementService = new CLIManagementService();
-    this.fileWatcherService = new FileWatcherService();
+    this.taskCacheService = new TaskCacheService(); // Now multi-folder aware
+    this.taskOperationsService = new TaskOperationsService(); // Now creates scoped CLIServices
+    this.cliManagementService = new CLIManagementService(); // Review if it needs context
+    this.fileWatcherService = new FileWatcherService(); // Now multi-folder aware
     this.setupEventHandlers();
+  }
+
+  /**
+   * Returns a list of URIs for workspace folders that are managed TaskMaster projects.
+   */
+  public getManagedFolderUris(): string[] {
+    return Array.from(this.managedWorkspaceFolderUris);
   }
 
   /**
    * Initialize the service and start polling if configured
    */
+  private async isTaskMasterProject(folderUriString: string): Promise<boolean> {
+    try {
+      const tasksJsonPath = vscode.Uri.joinPath(
+        vscode.Uri.parse(folderUriString),
+        ".taskmaster",
+        "tasks",
+        "tasks.json"
+      );
+      await vscode.workspace.fs.stat(tasksJsonPath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   public async initialize(): Promise<void> {
     if (this.isInitialized) {
       return;
     }
+    this.managedWorkspaceFolderUris.clear();
 
     try {
-      // Check CLI availability but don't block initialization
-      const isAvailable = await this.checkCLIAvailability();
-      if (!isAvailable) {
-        // Show warning but continue initialization since we can read from files
-        console.warn(
-          "Task Master CLI not available, but continuing with file-based operations"
-        );
-        this.emit("cliNotAvailable");
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (workspaceFolders) {
+        for (const folder of workspaceFolders) {
+          const folderUriString = folder.uri.toString();
+          if (await this.isTaskMasterProject(folderUriString)) {
+            console.log(
+              `Initializing TaskMaster for project in ${folderUriString}`
+            );
+            this.managedWorkspaceFolderUris.add(folderUriString);
+
+            // Check CLI availability for this specific folder
+            // Note: checkCLIAvailability might need to become folder-specific if CLI path can vary
+            const isAvailable = await this.checkCLIAvailability(
+              folderUriString
+            ); // Pass folder URI
+            if (!isAvailable) {
+              console.warn(
+                `Task Master CLI not available for ${folderUriString}, but continuing with file-based operations`
+              );
+              this.emit("cliNotAvailable", { folderUriString }); // Add context
+            }
+
+            // Setup file watchers for this folder
+            await this.fileWatcherService.setupWatchersForWorkspaceFolder(
+              folderUriString,
+              async (changedFolderUri) => {
+                await this.refreshTasks(changedFolderUri);
+              }
+            );
+
+            // Auto-load current tag on startup for this folder
+            await this.loadCurrentTagForFolder(folderUriString);
+          } else {
+            console.log(
+              `Folder ${folderUriString} is not a TaskMaster project, skipping.`
+            );
+          }
+        }
+      } else {
+        console.log("No workspace folders open. TaskManagerService not fully initialized.");
+        // Potentially handle single file open scenarios if desired, though less common for this extension type
       }
 
-      // Setup configuration change listener
-      this.configChangeListener = ConfigService.onConfigurationChanged(
-        (config) => {
-          this.handleConfigurationChange(config);
+      // Setup global configuration change listener (might need refinement if configs are per-folder)
+      this.configChangeListener = this.configService.onConfigurationChanged(
+        (config) => { // config here is global, might need to re-check all managed folders
+          this.handleConfigurationChange(config); // This method will need to iterate managed folders
         }
       );
 
-      // Setup file watchers for tasks and complexity files
-      await this.fileWatcherService.setupFileWatchers(async () => {
-        await this.refreshTasks();
-      });
-
-      // Auto-load current tag on startup
-      await this.loadCurrentTagOnStartup();
-
       this.isInitialized = true;
-      this.emit("initialized");
+      this.emit("initialized"); // Global initialized event
     } catch (error) {
       console.error("Failed to initialize TaskManagerService:", error);
-      this.emit("initializationError", error);
+      this.emit("initializationError", { error }); // Add context if possible, though this is global init error
     }
   }
 
   /**
-   * Auto-load current tag on startup by detecting from config and setting filter
+   * Auto-load current tag on startup for a specific folder.
+   * @param workspaceFolderUri The URI of the workspace folder.
    */
-  private async loadCurrentTagOnStartup(): Promise<void> {
+  private async loadCurrentTagForFolder(
+    workspaceFolderUri: string
+  ): Promise<void> {
     try {
-      console.log("Loading current tag on startup...");
+      console.log(
+        `Loading current tag on startup for ${workspaceFolderUri}...`
+      );
 
-      // Get current tag from TagService (reads from config.json)
-      const currentTag = this.getCurrentTag();
-      console.log(`Current tag detected: ${currentTag}`);
+      const currentTag = this.getCurrentTag(workspaceFolderUri); // Now takes URI
+      console.log(
+        `Current tag detected for ${workspaceFolderUri}: ${currentTag}`
+      );
 
-      // Update filter manager to use the current tag
-      setCurrentSelectedTag(currentTag);
-      console.log(`Filter manager updated to tag: ${currentTag}`);
+      // setCurrentSelectedTag is global from taskFilterUtils, this might need rethinking
+      // if filters are per-repo. For now, assuming one global filter UI.
+      // If the UI is global, which repo's tag should it show? The first one? Active one?
+      // This is a UX question. For now, let's assume it reflects the first managed folder.
+      if (
+        this.managedWorkspaceFolderUris.size > 0 &&
+        workspaceFolderUri ===
+          this.managedWorkspaceFolderUris.values().next().value
+      ) {
+        setCurrentSelectedTag(currentTag);
+        console.log(
+          `Global filter manager updated to tag from ${workspaceFolderUri}: ${currentTag}`
+        );
+      }
 
-      // Load tasks with current tag filtering
-      await this.refreshTasks();
-      console.log(`Tasks refreshed for tag: ${currentTag}`);
+      await this.refreshTasks(workspaceFolderUri); // Refresh tasks for this specific folder
+      console.log(`Tasks refreshed for ${workspaceFolderUri}, tag: ${currentTag}`);
 
-      // Emit tag change event to update UI components
+      // Emit tag change event to update UI components, with folder context
       this.emit("currentTagChanged", {
-        oldTag: "master", // Default from filter manager
+        oldTag: "master", // Placeholder, actual old tag might differ per folder
         newTag: currentTag,
+        workspaceFolderUri,
       });
     } catch (error) {
-      console.error("Failed to load current tag on startup:", error);
-      // Don't fail initialization, just use default behavior
+      console.error(
+        `Failed to load current tag for ${workspaceFolderUri}:`,
+        error
+      );
+      // Don't fail initialization for other folders
     }
   }
 
@@ -126,32 +196,59 @@ export class TaskManagerService extends EventEmitter {
    * Setup event handlers for CLI service and other services
    */
   private setupEventHandlers(): void {
-    this.cliService.on("outputReceived", (output: string) => {
-      this.emit("cliOutput", output);
-    });
+    // CLIService events are tricky if we have multiple instances or a configurable one.
+    // For now, assuming CLIService output is generic or TaskOperationsService handles its own.
+    // this.cliService.on("outputReceived", (output: string) => { // This cliService is no longer a member
+    //   this.emit("cliOutput", output);
+    // });
 
-    this.taskCacheService.on("tasksUpdated", (tasks: Task[]) => {
-      this.emit("tasksUpdated", tasks);
-    });
+    this.taskCacheService.on(
+      "tasksUpdated",
+      (payload: { tasks: Task[]; workspaceFolderUri: string }) => {
+        this.emit("tasksUpdated", payload); // Pass along with context
+      }
+    );
 
-    this.taskCacheService.on("refreshError", (error: any) => {
-      this.emit("refreshError", error);
-    });
+    this.taskCacheService.on(
+      "refreshError",
+      (payload: { error: any; workspaceFolderUri: string }) => {
+        this.emit("refreshError", payload); // Pass along with context
+      }
+    );
 
     // Add tag-related event handlers
-    this.taskCacheService.on("currentTagChanged", ({ oldTag, newTag }) => {
-      // Update the filter manager when tag changes
-      setCurrentSelectedTag(newTag);
-      this.emit("currentTagChanged", { oldTag, newTag });
-    });
+    this.taskCacheService.on(
+      "currentTagChanged",
+      (payload: {
+        oldTag: string;
+        newTag: string;
+        workspaceFolderUri: string;
+      }) => {
+        // setCurrentSelectedTag is global, update if this folder is the "primary" one for UI
+        if (
+          this.managedWorkspaceFolderUris.size > 0 &&
+          payload.workspaceFolderUri ===
+            this.managedWorkspaceFolderUris.values().next().value
+        ) {
+          setCurrentSelectedTag(payload.newTag);
+        }
+        this.emit("currentTagChanged", payload); // Pass along with context
+      }
+    );
 
-    this.taskCacheService.on("tagsUpdated", (tags: TagInfo[]) => {
-      this.emit("tagsUpdated", tags);
-    });
+    this.taskCacheService.on(
+      "tagsUpdated",
+      (payload: { tags: TagInfo[]; workspaceFolderUri: string }) => {
+        this.emit("tagsUpdated", payload); // Pass along with context
+      }
+    );
 
-    this.taskCacheService.on("tagError", (error: any) => {
-      this.emit("tagError", error);
-    });
+    this.taskCacheService.on(
+      "tagError",
+      (payload: { error: any; workspaceFolderUri: string }) => {
+        this.emit("tagError", payload); // Pass along with context
+      }
+    );
   }
 
   /**
@@ -163,108 +260,185 @@ export class TaskManagerService extends EventEmitter {
   }
 
   /**
-   * Check if CLI is available and prompt user if not
+   * Check if CLI is available for a specific workspace folder and prompt user if not.
+   * @param workspaceFolderUri The URI of the workspace folder.
    */
-  public async checkCLIAvailability(): Promise<boolean> {
-    const isAvailable = await this.cliService.checkCLIAvailability();
+  public async checkCLIAvailability(
+    workspaceFolderUri: string
+  ): Promise<boolean> {
+    // Create a temporary scoped CLIService to check availability for this folder
+    const scopedCliService = new CLIService(
+      this.configService.getConfig(workspaceFolderUri),
+      workspaceFolderUri
+    );
+    const isAvailable = await scopedCliService.checkCLIAvailability();
     if (!isAvailable) {
-      this.emit("cliNotAvailable");
-      await this.cliManagementService.handleCLINotAvailable();
+      // Emit with context, CLIManagementService might need to be context-aware too
+      this.emit("cliNotAvailable", { workspaceFolderUri });
+      // handleCLINotAvailable is global, might need adjustment or be called from UI layer
+      await this.cliManagementService.handleCLINotAvailable(
+        workspaceFolderUri
+      );
     }
     return isAvailable;
   }
 
   /**
-   * Check CLI version and validate against minimum requirements
+   * Check CLI version for a specific workspace folder.
+   * @param workspaceFolderUri The URI of the workspace folder.
    */
-  public async checkCLIVersion(): Promise<{
+  public async checkCLIVersion(
+    workspaceFolderUri: string
+  ): Promise<{
     isValid: boolean;
     currentVersion?: string;
     minRequiredVersion: string;
     error?: string;
   }> {
-    return await this.cliService.checkCLIVersion();
+    const scopedCliService = new CLIService(
+      this.configService.getConfig(workspaceFolderUri),
+      workspaceFolderUri
+    );
+    return await scopedCliService.checkCLIVersion();
   }
 
   /**
-   * Refresh tasks manually
+   * Refresh tasks manually for a specific workspace folder.
+   * @param workspaceFolderUri The URI of the workspace folder.
    */
-  public async refreshTasks(): Promise<TaskMasterResponse | null> {
-    return await this.taskCacheService.refreshTasksFromFile();
+  public async refreshTasks(
+    workspaceFolderUri: string
+  ): Promise<TaskMasterResponse | null> {
+    if (!this.managedWorkspaceFolderUris.has(workspaceFolderUri)) {
+      console.warn(
+        `refreshTasks called for unmanaged folder: ${workspaceFolderUri}`
+      );
+      return null;
+    }
+    return await this.taskCacheService.refreshTasksFromFile(workspaceFolderUri);
   }
 
   /**
-   * Get cached tasks
+   * Get cached tasks for a specific workspace folder.
+   * @param workspaceFolderUri The URI of the workspace folder.
    */
-  public getTasks(): Task[] {
-    return this.taskCacheService.getTasks();
+  public getTasks(workspaceFolderUri: string): Task[] {
+    if (!this.managedWorkspaceFolderUris.has(workspaceFolderUri)) {
+      return [];
+    }
+    return this.taskCacheService.getTasks(workspaceFolderUri);
   }
 
   /**
-   * Get cached response with metadata
+   * Get cached response with metadata for a specific workspace folder.
+   * @param workspaceFolderUri The URI of the workspace folder.
    */
-  public getResponse(): TaskMasterResponse | null {
-    return this.taskCacheService.getResponse();
+  public getResponse(
+    workspaceFolderUri: string
+  ): TaskMasterResponse | null {
+    if (!this.managedWorkspaceFolderUris.has(workspaceFolderUri)) {
+      return null;
+    }
+    return this.taskCacheService.getResponse(workspaceFolderUri);
   }
 
   /**
-   * Get tasks filtered by status
+   * Get tasks filtered by status for a specific workspace folder.
+   * @param workspaceFolderUri The URI of the workspace folder.
    */
-  public getTasksByStatus(status: TaskStatus): Task[] {
-    return this.taskCacheService.getTasksByStatus(status);
+  public getTasksByStatus(
+    workspaceFolderUri: string,
+    status: TaskStatus
+  ): Task[] {
+    if (!this.managedWorkspaceFolderUris.has(workspaceFolderUri)) {
+      return [];
+    }
+    return this.taskCacheService.getTasksByStatus(workspaceFolderUri, status);
   }
 
   /**
-   * Get a specific task by ID
+   * Get a specific task by ID for a specific workspace folder.
+   * @param workspaceFolderUri The URI of the workspace folder.
    */
-  public getTask(id: number): Task | undefined {
-    return this.taskCacheService.getTask(id);
+  public getTask(
+    workspaceFolderUri: string,
+    id: number
+  ): Task | undefined {
+    if (!this.managedWorkspaceFolderUris.has(workspaceFolderUri)) {
+      return undefined;
+    }
+    return this.taskCacheService.getTask(workspaceFolderUri, id);
   }
 
   /**
-   * Execute a task command (mark complete, etc.) with security validation
+   * Execute a task command for a specific workspace folder.
+   * @param workspaceFolderUri The URI of the workspace folder.
    */
   public async executeTaskCommand(
+    workspaceFolderUri: string,
     command: string,
     taskId: number,
     status?: string
   ): Promise<boolean> {
+    if (!this.managedWorkspaceFolderUris.has(workspaceFolderUri)) {
+      console.warn(
+        `executeTaskCommand called for unmanaged folder: ${workspaceFolderUri}`
+      );
+      return false;
+    }
     const result = await this.taskOperationsService.executeTaskCommand(
+      workspaceFolderUri,
       command,
       taskId,
       status
     );
     if (result) {
-      await this.refreshTasks();
+      // Refresh tasks for the specific folder where the command was executed
+      await this.refreshTasks(workspaceFolderUri);
     }
     return result;
   }
 
   /**
-   * Get next actionable task or subtask
+   * Get next actionable task or subtask for a specific workspace folder.
+   * @param workspaceFolderUri The URI of the workspace folder.
    */
-  public async getNextTaskOrSubtask(): Promise<TaskOrSubtask | null> {
+  public async getNextTaskOrSubtask(
+    workspaceFolderUri: string
+  ): Promise<TaskOrSubtask | null> {
+    if (!this.managedWorkspaceFolderUris.has(workspaceFolderUri)) {
+      return null;
+    }
     try {
-      // Use the CLI next command directly (bypass file reading)
-      const rawOutput = await this.cliService.getNextTaskFromCLI();
+      const scopedCliService = new CLIService(
+        this.configService.getConfig(workspaceFolderUri),
+        workspaceFolderUri
+      );
+      const rawOutput = await scopedCliService.getNextTaskFromCLI();
+
       if (rawOutput) {
-        const parsed = parseNextTaskOutput(rawOutput);
+        const parsed = parseNextTaskOutput(rawOutput); // parseNextTaskOutput is global
         if (parsed.id) {
           if (parsed.isSubtask && typeof parsed.id === "string") {
-            // Find the subtask and its parent task in our cached tasks
-            const parentId = parsed.id.split(".")[0];
-            const subtaskId = parsed.id.split(".")[1];
-            const subtask = this.findSubtaskById(parseInt(parentId), subtaskId);
+            const parentIdStr = parsed.id.split(".")[0];
+            const subtaskIdStr = parsed.id.split(".")[1];
+            const subtask = this.findSubtaskById(
+              workspaceFolderUri,
+              parseInt(parentIdStr),
+              subtaskIdStr
+            );
 
-            if (parsed.isSubtask) {
+            if (subtask) { // Check if subtask is found
               return {
                 type: "subtask",
-                subtask: subtask!,
+                subtask: subtask, // Already includes parentId
               };
             }
           } else {
-            // Regular task - find it in our cached tasks
-            const task = this.getTask(parsed.id as number);
+            const task = this.getTask(
+              workspaceFolderUri,
+              parsed.id as number
+            );
             if (task) {
               return {
                 type: "task",
@@ -275,22 +449,28 @@ export class TaskManagerService extends EventEmitter {
         }
       }
 
-      // Fallback to cache service if CLI parsing fails
-      const fallbackTask = this.taskCacheService.getNextTask();
+      // Fallback to cache service for the specific folder
+      const fallbackTask = this.taskCacheService.getNextTask(
+        workspaceFolderUri
+      );
       if (fallbackTask) {
-        log("fallbackTask");
+        log(`Fallback next task for ${workspaceFolderUri}:`, fallbackTask);
         return {
           type: "task",
           task: fallbackTask,
         };
       }
 
-      log("null");
+      log(`No next task for ${workspaceFolderUri}`);
       return null;
     } catch (error) {
-      console.error("Failed to get next task from CLI:", error);
-      // Fallback: use cache service
-      const fallbackTask = this.taskCacheService.getNextTask();
+      console.error(
+        `Failed to get next task from CLI for ${workspaceFolderUri}:`,
+        error
+      );
+      const fallbackTask = this.taskCacheService.getNextTask(
+        workspaceFolderUri
+      );
       if (fallbackTask) {
         return {
           type: "task",
@@ -302,10 +482,13 @@ export class TaskManagerService extends EventEmitter {
   }
 
   /**
-   * Get next actionable task (legacy method for compatibility)
+   * Get next actionable task for a specific workspace folder.
+   * @param workspaceFolderUri The URI of the workspace folder.
    */
-  public async getNextTask(): Promise<Task | null> {
-    const result = await this.getNextTaskOrSubtask();
+  public async getNextTask(
+    workspaceFolderUri: string
+  ): Promise<Task | null> {
+    const result = await this.getNextTaskOrSubtask(workspaceFolderUri);
     if (result) {
       if (result.type === "task") {
         return result.task;
@@ -331,33 +514,36 @@ export class TaskManagerService extends EventEmitter {
    * Find a subtask by its ID (format: "parentId.subtaskId") in the cached tasks
    */
   /**
-   * Find a subtask by its parent task ID and subtask ID
-   * @param parentId - ID of the parent task
-   * @param subtaskId - ID of the subtask (can be just the ID or parentId.subtaskId format)
-   * @returns The matching subtask or null if not found
+   * Find a subtask by its parent task ID and subtask ID for a specific workspace folder.
+   * @param workspaceFolderUri The URI of the workspace folder.
+   * @param parentId - ID of the parent task.
+   * @param subtaskId - ID of the subtask (can be just the ID or parentId.subtaskId format).
+   * @returns The matching subtask or null if not found.
    */
-  private findSubtaskById(parentId: number, subtaskId: string): Subtask | null {
-    const tasks = this.getTasks();
+  private findSubtaskById(
+    workspaceFolderUri: string,
+    parentId: number,
+    subtaskId: string
+  ): Subtask | null {
+    if (!this.managedWorkspaceFolderUris.has(workspaceFolderUri)) {
+      return null;
+    }
+    const tasks = this.getTasks(workspaceFolderUri);
 
-    // Find the parent task
     const parentTask = tasks.find((task) => task.id === parentId);
     if (!parentTask?.subtasks) {
       return null;
     }
 
-    // Check both possible subtask ID formats:
-    // 1. Just the subtask ID number
-    // 2. Full format: "parentId.subtaskId"
     const subtask = parentTask.subtasks.find(
-      (subtask) =>
-        subtask.id === parseInt(subtaskId) ||
-        subtask.id === `${parentId}.${subtaskId}`
+      (st) =>
+        st.id === parseInt(subtaskId) || st.id === `${parentId}.${subtaskId}`
     );
 
     if (subtask) {
       return {
         ...subtask,
-        parentId: parentId,
+        parentId: parentId, // Ensure parentId is part of the returned Subtask object
       };
     } else {
       return null;
@@ -365,18 +551,20 @@ export class TaskManagerService extends EventEmitter {
   }
 
   /**
-   * Get current task (first in-progress task, or fallback to first pending)
+   * Get current task (first in-progress task, or fallback to first pending) for a specific workspace folder.
+   * @param workspaceFolderUri The URI of the workspace folder.
    */
-  public getCurrentTask(): Task | null {
-    const tasks = this.getTasks();
+  public getCurrentTask(workspaceFolderUri: string): Task | null {
+    if (!this.managedWorkspaceFolderUris.has(workspaceFolderUri)) {
+      return null;
+    }
+    const tasks = this.getTasks(workspaceFolderUri);
 
-    // First, look for an in-progress task
     const inProgressTask = tasks.find((task) => task.status === "in-progress");
     if (inProgressTask) {
       return inProgressTask;
     }
 
-    // Fallback: get first pending task
     const pendingTask = tasks.find((task) => task.status === "pending");
     return pendingTask || null;
   }

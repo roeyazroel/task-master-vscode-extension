@@ -2,6 +2,22 @@ import * as vscode from "vscode";
 import { Subtask, Task } from "../types";
 
 /**
+ * Tree item representing a repository in a multi-root workspace.
+ */
+export class RepositoryTreeItem extends vscode.TreeItem {
+  constructor(
+    public readonly workspaceFolder: vscode.WorkspaceFolder,
+    public readonly collapsibleState: vscode.TreeItemCollapsibleState = vscode
+      .TreeItemCollapsibleState.Expanded
+  ) {
+    super(workspaceFolder.name, collapsibleState);
+    this.tooltip = `${workspaceFolder.uri.fsPath}`;
+    this.iconPath = new vscode.ThemeIcon("repo");
+    this.contextValue = "repository";
+  }
+}
+
+/**
  * Tree item representing a task or subtask in the tree view
  */
 export class TaskTreeItem extends vscode.TreeItem {
@@ -10,7 +26,8 @@ export class TaskTreeItem extends vscode.TreeItem {
     public readonly subtask: Subtask | null,
     public readonly collapsibleState: vscode.TreeItemCollapsibleState,
     public readonly isSubtask: boolean = false,
-    private readonly allTasks: Task[] = []
+    private readonly allTasks: Task[] = [], // Represents tasks for the current context (repo or global)
+    public readonly workspaceFolder?: vscode.WorkspaceFolder // Optional: for multi-root context
   ) {
     const label = task?.title || subtask?.title || "Unknown";
     super(label, collapsibleState);
@@ -184,7 +201,8 @@ export class TaskInfoTreeItem extends vscode.TreeItem {
       title: string;
       status: string;
     },
-    label?: string
+    label?: string,
+    public readonly workspaceFolder?: vscode.WorkspaceFolder // Optional: for multi-root context
   ) {
     super(label || "", vscode.TreeItemCollapsibleState.None);
 
@@ -225,93 +243,148 @@ export class TaskInfoTreeItem extends vscode.TreeItem {
  * Tree data provider for Task Master tasks
  */
 export class TaskTreeProvider
-  implements vscode.TreeDataProvider<TaskTreeItem | TaskInfoTreeItem>
+  implements
+    vscode.TreeDataProvider<
+      TaskTreeItem | TaskInfoTreeItem | RepositoryTreeItem
+    >
 {
   private _onDidChangeTreeData: vscode.EventEmitter<
-    TaskTreeItem | TaskInfoTreeItem | undefined | null | void
+    TaskTreeItem | TaskInfoTreeItem | RepositoryTreeItem | undefined | null | void
   > = new vscode.EventEmitter<
-    TaskTreeItem | TaskInfoTreeItem | undefined | null | void
+    | TaskTreeItem
+    | TaskInfoTreeItem
+    | RepositoryTreeItem
+    | undefined
+    | null
+    | void
   >();
   readonly onDidChangeTreeData: vscode.Event<
-    TaskTreeItem | TaskInfoTreeItem | undefined | null | void
+    TaskTreeItem | TaskInfoTreeItem | RepositoryTreeItem | undefined | null | void
   > = this._onDidChangeTreeData.event;
 
-  private tasks: Task[] = [];
-  private currentTask: Task | null = null;
-  private nextTask: Task | null = null;
+  private tasksByFolder: Map<string, Task[]> = new Map();
+  private currentTaskByFolder: Map<string, Task | null> = new Map();
+  private nextTaskByFolder: Map<string, Task | null> = new Map();
+  private taskManagerService: any; // TODO: Import and use TaskManagerService type
 
-  /**
-   * Update the tasks and refresh the tree view
-   */
-  public updateTasks(tasks: Task[]): void {
-    this.tasks = tasks;
-    this._onDidChangeTreeData.fire();
+  // TODO: This is a temporary solution. TaskManagerService should be properly injected or accessed.
+  public setTaskManagerService(taskManagerService: any) {
+    this.taskManagerService = taskManagerService;
   }
 
   /**
-   * Update current and next task information
+   * Refresh data for a specific folder URI or all if URI is undefined.
+   * This will trigger re-fetching from TaskManagerService.
    */
-  public updateCurrentAndNextTasks(
-    currentTask: Task | null,
-    nextTask: Task | null
-  ): void {
-    this.currentTask = currentTask;
-    this.nextTask = nextTask;
-    this._onDidChangeTreeData.fire();
+  public async refresh(element?: TaskTreeItem | TaskInfoTreeItem | RepositoryTreeItem | string): Promise<void> {
+    let folderToRefresh: string | undefined = undefined;
+    if (typeof element === 'string') {
+      folderToRefresh = element;
+    } else if (element instanceof RepositoryTreeItem) {
+      folderToRefresh = element.workspaceFolder.uri.toString();
+    } else if (element instanceof TaskTreeItem && element.workspaceFolder) {
+      folderToRefresh = element.workspaceFolder.uri.toString();
+    } else if (element instanceof TaskInfoTreeItem && element.workspaceFolder) {
+      folderToRefresh = element.workspaceFolder.uri.toString();
+    }
+
+    if (folderToRefresh && this.taskManagerService) {
+      // Fetch and update data for the specific folder
+      const tasks = this.taskManagerService.getTasks(folderToRefresh);
+      this.tasksByFolder.set(folderToRefresh, tasks || []);
+
+      const currentTask = this.taskManagerService.getCurrentTask(folderToRefresh);
+      this.currentTaskByFolder.set(folderToRefresh, currentTask);
+
+      const nextTask = await this.taskManagerService.getNextTask(folderToRefresh);
+      this.nextTaskByFolder.set(folderToRefresh, nextTask);
+
+      this._onDidChangeTreeData.fire(folderToRefresh ? undefined : element); // Refresh specific part if possible
+    } else {
+      // Full refresh - might need to iterate all known folders from taskManagerService
+      // For now, just a general refresh signal
+      this._onDidChangeTreeData.fire();
+    }
+  }
+
+  /**
+   * Called by TaskManagerService when tasks for a specific folder are updated.
+   * @param workspaceFolderUri URI of the folder whose tasks were updated.
+   * @param tasks The new list of tasks for that folder.
+   */
+  public handleTasksUpdated(workspaceFolderUri: string, tasks: Task[]): void {
+    this.tasksByFolder.set(workspaceFolderUri, tasks);
+    this.refresh(workspaceFolderUri); // Trigger a targeted refresh
+  }
+
+  /**
+   * Called by TaskManagerService when current/next tasks for a folder are updated.
+   * @param workspaceFolderUri URI of the folder.
+   * @param currentTask The current task.
+   * @param nextTask The next task.
+   */
+  public handleCurrentNextUpdated(workspaceFolderUri: string, currentTask: Task | null, nextTask: Task | null): void {
+    this.currentTaskByFolder.set(workspaceFolderUri, currentTask);
+    this.nextTaskByFolder.set(workspaceFolderUri, nextTask);
+    this.refresh(workspaceFolderUri); // Trigger a targeted refresh
   }
 
   /**
    * Get tree item representation
    */
-  getTreeItem(element: TaskTreeItem | TaskInfoTreeItem): vscode.TreeItem {
+  getTreeItem(
+    element: TaskTreeItem | TaskInfoTreeItem | RepositoryTreeItem
+  ): vscode.TreeItem {
     return element;
   }
 
   /**
    * Get children of a tree item
    */
-  getChildren(
-    element?: TaskTreeItem | TaskInfoTreeItem
-  ): Thenable<(TaskTreeItem | TaskInfoTreeItem)[]> {
+  async getChildren(
+    element?: TaskTreeItem | TaskInfoTreeItem | RepositoryTreeItem
+  ): Promise<(TaskTreeItem | TaskInfoTreeItem | RepositoryTreeItem)[]> {
     if (!element) {
-      // Root level - return task info items followed by tasks
-      const items: (TaskTreeItem | TaskInfoTreeItem)[] = [];
-
-      // Add current task info
-      if (this.currentTask) {
-        items.push(
-          new TaskInfoTreeItem("current", {
-            id: this.currentTask.id,
-            title: this.currentTask.title,
-            status: this.currentTask.status,
-          })
+      // Root level
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (workspaceFolders && workspaceFolders.length > 1) {
+          // Multi-root workspace: show repository nodes for managed TaskMaster projects
+          if (!this.taskManagerService) { // Guard against taskManagerService not being set yet
+            return [];
+          }
+          const managedUris = this.taskManagerService.getManagedFolderUris ? this.taskManagerService.getManagedFolderUris() : [];
+          const managedTaskMasterFolders = workspaceFolders.filter(folder =>
+            managedUris.includes(folder.uri.toString())
         );
+
+          if (managedTaskMasterFolders.length > 1) { // Only show individual repo nodes if more than one TM project
+            return managedTaskMasterFolders.map(
+              (folder) => new RepositoryTreeItem(folder)
+            );
+          } else if (managedTaskMasterFolders.length === 1) {
+            // If only one TaskMaster project in a multi-folder workspace, show its tasks directly
+            return this.getRootTaskItems(managedTaskMasterFolders[0]);
+          } else {
+            // No TaskMaster projects found in the multi-folder workspace
+            // Optionally, return a message item: new vscode.TreeItem("No TaskMaster projects found.");
+            return [];
+          }
+        } else if (workspaceFolders && workspaceFolders.length === 1) {
+          // Single folder workspace: show tasks directly if it's a TM project
+          if (!this.taskManagerService) return [];
+          const folderUri = workspaceFolders[0].uri.toString();
+          if (this.taskManagerService.getManagedFolderUris && this.taskManagerService.getManagedFolderUris().includes(folderUri)) {
+            return this.getRootTaskItems(workspaceFolders[0]);
+          }
+          return []; // Not a TM project
       } else {
-        items.push(new TaskInfoTreeItem("current"));
+          // No workspace open
+          return [];
       }
-
-      // Add next task info
-      if (this.nextTask) {
-        items.push(
-          new TaskInfoTreeItem("next", {
-            id: this.nextTask.id,
-            title: this.nextTask.title,
-            status: this.nextTask.status,
-          })
-        );
-      } else {
-        items.push(new TaskInfoTreeItem("next"));
-      }
-
-      // Add separator if we have any tasks
-      if (this.tasks.length > 0) {
-        items.push(new TaskInfoTreeItem("separator"));
-      }
-
-      // Add all tasks
-      items.push(...this.getTaskTreeItems());
-
-      return Promise.resolve(items);
+    } else if (element instanceof RepositoryTreeItem) {
+      // Children of a repository node: show tasks for this repository
+        // This now correctly uses the per-folder data via getRootTaskItems
+      return this.getRootTaskItems(element.workspaceFolder);
     } else if (
       element instanceof TaskTreeItem &&
       element.task &&
@@ -319,41 +392,129 @@ export class TaskTreeProvider
       element.task.subtasks.length > 0
     ) {
       // Task with subtasks - return subtask items
-      return Promise.resolve(this.getSubtaskTreeItems(element.task));
+      return this.getSubtaskTreeItems(element.task);
     } else {
-      // No children
-      return Promise.resolve([]);
+      // No children for TaskInfoTreeItem or tasks without subtasks
+      return [];
     }
   }
 
   /**
-   * Get tree items for tasks
+   * Helper to get root items (TaskInfo and Tasks) for a given workspace folder or globally.
+   * @param workspaceFolder Optional. If provided, tasks should be filtered for this folder.
    */
-  private getTaskTreeItems(): TaskTreeItem[] {
-    if (!this.tasks || this.tasks.length === 0) {
+  private getRootTaskItems(
+    workspaceFolder?: vscode.WorkspaceFolder
+  ): (TaskTreeItem | TaskInfoTreeItem)[] {
+    const folderUriString = workspaceFolder?.uri.toString();
+    const items: (TaskTreeItem | TaskInfoTreeItem)[] = [];
+
+    const currentTasks = folderUriString
+      ? this.tasksByFolder.get(folderUriString) || []
+      : []; // Or handle no-folder case differently
+    const currentTask = folderUriString
+      ? this.currentTaskByFolder.get(folderUriString)
+      : null;
+    const nextTask = folderUriString
+      ? this.nextTaskByFolder.get(folderUriString)
+      : null;
+
+    // Add current task info
+    if (currentTask) {
+      items.push(
+        new TaskInfoTreeItem(
+          "current",
+          {
+            id: currentTask.id,
+            title: currentTask.title,
+            status: currentTask.status,
+          },
+          undefined,
+          workspaceFolder
+        )
+      );
+    } else {
+      items.push(new TaskInfoTreeItem("current", undefined, undefined, workspaceFolder));
+    }
+
+    // Add next task info
+    if (nextTask) {
+      items.push(
+        new TaskInfoTreeItem(
+          "next",
+          {
+            id: nextTask.id,
+            title: nextTask.title,
+            status: nextTask.status,
+          },
+          undefined,
+          workspaceFolder
+        )
+      );
+    } else {
+      items.push(new TaskInfoTreeItem("next", undefined, undefined, workspaceFolder));
+    }
+
+    // Add separator if we have any tasks for this folder
+    if (currentTasks.length > 0) {
+      items.push(new TaskInfoTreeItem("separator", undefined, undefined, workspaceFolder));
+    }
+
+    items.push(...this.getTaskTreeItems(currentTasks, workspaceFolder));
+
+    return items;
+  }
+
+  /**
+   * Get tree items for tasks for a specific folder.
+   * @param tasksForFolder Tasks for the specific folder.
+   * @param workspaceFolder Workspace folder context.
+   */
+  private getTaskTreeItems(
+    tasksForFolder: Task[],
+    workspaceFolder?: vscode.WorkspaceFolder
+  ): TaskTreeItem[] {
+    if (!tasksForFolder || tasksForFolder.length === 0) {
       return [];
     }
 
-    return this.tasks.map((task) => {
+    return tasksForFolder.map((task) => {
       const hasSubtasks = task.subtasks && task.subtasks.length > 0;
       const collapsibleState = hasSubtasks
         ? vscode.TreeItemCollapsibleState.Collapsed
         : vscode.TreeItemCollapsibleState.None;
 
-      return new TaskTreeItem(task, null, collapsibleState, false, this.tasks);
+      // Pass allTasks for this folder context for dependency display
+      return new TaskTreeItem(
+        task,
+        null,
+        collapsibleState,
+        false,
+        tasksForFolder,
+        workspaceFolder
+      );
     });
   }
 
   /**
-   * Get tree items for subtasks of a given task
+   * Get tree items for subtasks of a given task.
+   * @param task The parent task.
+   * @param workspaceFolder Workspace folder context for the parent task.
    */
-  private getSubtaskTreeItems(task: Task): TaskTreeItem[] {
+  private getSubtaskTreeItems(
+    task: Task,
+    workspaceFolder?: vscode.WorkspaceFolder
+  ): TaskTreeItem[] {
     if (!task.subtasks || task.subtasks.length === 0) {
       return [];
     }
 
+    // Get all tasks for the current folder to resolve subtask dependencies
+    const allTasksForFolder = workspaceFolder
+      ? this.tasksByFolder.get(workspaceFolder.uri.toString()) || []
+      : [];
+
     return task.subtasks.map((subtask) => {
-      // Ensure parentId is set correctly
       const subtaskWithParentId = {
         ...subtask,
         parentId: Number(task.id),
@@ -364,47 +525,63 @@ export class TaskTreeProvider
         subtaskWithParentId,
         vscode.TreeItemCollapsibleState.None,
         true,
-        this.tasks
+        allTasksForFolder, // Pass all tasks from the same folder for context
+        workspaceFolder
       );
     });
   }
 
-  /**
-   * Refresh the tree view
-   */
-  public refresh(): void {
-    this._onDidChangeTreeData.fire();
-  }
+  // refresh method already updated to be context-aware or global
 
   /**
    * Get parent of a tree item (required for tree view)
    */
   getParent(
-    element: TaskTreeItem | TaskInfoTreeItem
-  ): vscode.ProviderResult<TaskTreeItem | TaskInfoTreeItem> {
-    // TaskInfoTreeItem instances have no parents (they are at root level)
-    if (element instanceof TaskInfoTreeItem) {
+    element: TaskTreeItem | TaskInfoTreeItem | RepositoryTreeItem
+  ): vscode.ProviderResult<
+    TaskTreeItem | TaskInfoTreeItem | RepositoryTreeItem
+  > {
+    // RepositoryTreeItems are root elements, so they have no parent.
+    if (element instanceof RepositoryTreeItem) {
       return null;
     }
 
-    // For subtasks, find the parent task
-    if (element.isSubtask && element.subtask) {
-      const parentTask = this.tasks.find((task) =>
-        task.subtasks?.some((subtask) => subtask.id === element.subtask?.id)
+    // For TaskTreeItem (tasks) and TaskInfoTreeItem (current/next info),
+    // their parent could be a RepositoryTreeItem if in a multi-root workspace.
+    if (element.workspaceFolder) {
+      // If workspaceFolder is defined, this item belongs to a repository.
+      return new RepositoryTreeItem(element.workspaceFolder);
+    }
+
+    // If it's a subtask, its parent is a TaskTreeItem.
+    // This logic needs to ensure the parent task is also associated with the correct workspaceFolder if applicable.
+    if (
+      element instanceof TaskTreeItem &&
+      element.isSubtask &&
+      element.subtask &&
+      element.workspaceFolder // Subtasks should have a workspaceFolder context
+    ) {
+      const tasksInFolder =
+        this.tasksByFolder.get(element.workspaceFolder.uri.toString()) || [];
+      const parentTask = tasksInFolder.find((task) =>
+        task.subtasks?.some(
+          (subtask) => subtask.id === element.subtask?.id
+        )
       );
 
       if (parentTask) {
         return new TaskTreeItem(
           parentTask,
           null,
-          vscode.TreeItemCollapsibleState.Expanded,
+          vscode.TreeItemCollapsibleState.Expanded, // Parent should be expanded to show this subtask
           false,
-          this.tasks
+          tasksInFolder, // Context for this task's dependencies
+          element.workspaceFolder // Propagate workspaceFolder context
         );
       }
     }
 
-    // Tasks don't have parents (they are root level)
+    // If none of the above, it's a root-level item (e.g., task in single-folder view, or info item in single-folder view)
     return null;
   }
 }
