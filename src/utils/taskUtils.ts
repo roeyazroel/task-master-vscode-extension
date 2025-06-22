@@ -85,7 +85,9 @@ export function fixSubtaskIds(tasks: Task[]): {
           fixedSubtask.id.includes(".")
         ) {
           const parts = fixedSubtask.id.split(".");
-          log(`Subtask ID: ${fixedSubtask.id}, Parts: ${parts}, Task ID: ${task.id}`);
+          log(
+            `Subtask ID: ${fixedSubtask.id}, Parts: ${parts}, Task ID: ${task.id}`
+          );
           if (parts.length === 2 && parts[0] === String(task.id)) {
             // Convert to simple numeric ID (use index + 1 for 1-based numbering)
             const newId = index + 1;
@@ -109,8 +111,6 @@ export function fixSubtaskIds(tasks: Task[]): {
 
     return fixedTask;
   });
-
-  log(`Fixed subtasks: ${fixedTasks}`);
 
   return {
     tasks: fixedTasks,

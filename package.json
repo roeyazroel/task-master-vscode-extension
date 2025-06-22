@@ -301,7 +301,7 @@
       "explorer/context": [
         {
           "command": "taskMaster.parsePRDFromFile",
-          "when": "resourceExtname == .txt",
+          "when": "resourceExtname == .txt || resourceExtname == .md",
           "group": "taskmaster@1",
           "title": "Generate Tasks from PRD"
         }

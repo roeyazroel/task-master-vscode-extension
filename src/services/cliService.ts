@@ -11,6 +11,7 @@ import {
   TasksFileStructure,
   TaskStats,
 } from "../types";
+import { log } from "../utils/logger";
 
 /**
  * Service for interacting with Task Master CLI
@@ -539,6 +540,8 @@ export class CLIService extends EventEmitter {
         args.push("--research");
       }
 
+      args.push("--append");
+
       const childProcess = spawn(this.config.cliPath, args, {
         cwd: vscode.workspace.rootPath || process.cwd(),
         stdio: ["ignore", "pipe", "pipe"],
@@ -575,6 +578,7 @@ export class CLIService extends EventEmitter {
           // Include both stderr and stdout in error message for better debugging
           const errorOutput =
             stderr.trim() || stdout.trim() || "No error output";
+          log("errorOutput", errorOutput);
           reject(
             new Error(
               `Parse-PRD command failed with code ${code}: ${errorOutput}`

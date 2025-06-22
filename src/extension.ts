@@ -608,6 +608,7 @@ function registerCommands(
               openLabel: "Select PRD File",
               filters: {
                 "Text files": ["txt"],
+                "Markdown files": ["md"],
                 "All files": ["*"],
               },
             });

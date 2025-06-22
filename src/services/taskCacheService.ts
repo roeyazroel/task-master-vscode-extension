@@ -74,7 +74,6 @@ export class TaskCacheService extends EventEmitter {
 
       // Fix subtask IDs and check if changes were made
       const subtaskFixResult = fixSubtaskIds(fixedTasks);
-      log(`Subtask fix result: ${subtaskFixResult}`);
       let finalTasks = subtaskFixResult.tasks;
 
       // If subtask IDs were fixed, we need to trigger a file update via CLI

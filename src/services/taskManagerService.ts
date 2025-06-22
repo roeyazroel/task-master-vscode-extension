@@ -285,7 +285,6 @@ export class TaskManagerService extends EventEmitter {
         };
       }
 
-      log("null");
       return null;
     } catch (error) {
       console.error("Failed to get next task from CLI:", error);
@@ -663,10 +662,13 @@ export class TaskManagerService extends EventEmitter {
    */
   public async parsePRDFromFile(filePath: string): Promise<void> {
     try {
-      // Validate that the file has a .txt extension
-      if (!filePath.toLowerCase().endsWith(".txt")) {
+      // Validate that the file has a .txt or .md  extension
+      if (
+        !filePath.toLowerCase().endsWith(".txt") &&
+        !filePath.toLowerCase().endsWith(".md")
+      ) {
         vscode.window.showErrorMessage(
-          "Parse-PRD command only supports .txt files"
+          "Parse-PRD command only supports .txt or .md files"
         );
         return;
       }

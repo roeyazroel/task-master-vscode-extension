@@ -579,162 +579,1055 @@
       },
       {
         "id": 21,
-        "title": "Add Workspace Support for Task-Master Configuration",
-        "description": "Enhance the extension so that it can intelligently detect whether the user has opened a single-folder repository or a multi-root VSCode workspace.  In workspace mode the UI tree must add a repository-level grouping that aggregates and displays all tasks (including *Current* and *Next*) under the corresponding repo node.  After context detection the extension must locate and apply an authoritative .taskmaster configuration using the rules below.",
-        "status": "pending",
-        "dependencies": [
-          11,
-          17
-        ],
+        "title": "Implement Workspace Detection Service",
+        "description": "Create a comprehensive workspace detection service that can identify single-folder vs multi-root workspaces and monitor dynamic changes",
+        "details": "Create WorkspaceDetectionService class with methods to detect workspace type, monitor changes via vscode.workspace.onDidChangeWorkspaceFolders, and provide workspace context. Implement WorkspaceContext interface with type detection ('single-folder' | 'multi-root' | 'empty'), folder enumeration, and .code-workspace file detection. Use VS Code API 1.74+ features for workspace folder management. Handle edge cases like empty workspaces and virtual file systems. Implement real-time updates when folders are added/removed. Use TypeScript 5.0+ with strict mode for type safety.",
+        "testStrategy": "Unit tests for workspace type detection logic, integration tests for dynamic folder changes, mock VS Code workspace API for isolated testing, test edge cases with empty and virtual workspaces",
         "priority": "high",
-        "details": "Task-Master currently looks for a configuration folder inside each individual repository and renders a global task tree.  With true workspace support we now need two parallel enhancements:\n\nA. Context & configuration lookup (previous requirement, unchanged in spirit)\n------------------------------------------------------------\n1. Detect context\n   • Multi-root workspace: treat the workspace file (.code-workspace) as the top-level context.\n   • Single-folder: treat the opened folder as both workspace and repository.\n\n2. Configuration search strategy\n   a. Multi-root workspace: look for a .taskmaster folder at workspace root.  If present, apply it to all repos; otherwise fall back to per-repo configs.\n   b. Single-folder: look only inside the opened folder for .taskmaster.\n\n3. Precedence: workspace-level config > repo-level config > extension defaults.\n\n4. Edge cases still apply (multiple configs, dynamic folder add/remove, etc.).\n\nB. Tree-view re-architecture (NEW requirement)\n------------------------------------------------------------\n1. When the extension detects workspace mode, the Task Tree view must introduce an additional level: Repository node ➞ {Current | Next | All Tasks | custom groups}.\n2. Each repo node aggregates tasks belonging to that folder only; workspace-level commands may still operate on every repo under the hood.\n3. Single-folder mode keeps the existing flat tree for backward compatibility.\n4. The provider must react to dynamic workspace changes (folder addition/removal) and update the repo nodes in real-time.\n5. Telemetry/logging: emit diagnostics when tasks cannot be mapped to a repo node.\n6. Documentation & examples must illustrate the new tree structure side-by-side with configuration precedence rules.",
-        "testStrategy": "1. Single-folder mode\n   • Open a lone repository with its own .taskmaster folder.\n   • Verify the tree view contains no repository wrapper node and the existing structure remains intact.\n\n2. Workspace mode with workspace-level config\n   • Create a workspace containing three Git folders plus a .taskmaster folder at workspace root.\n   • Confirm that a repo node appears for each folder and that Current/Next/All Tasks underneath each node reflect the workspace-level config.\n\n3. Workspace mode without workspace-level config\n   • Remove the root config and place .taskmaster folders in two repos only.\n   • Ensure each of those two repos show their respective tasks while the third repo falls back to defaults.\n\n4. Conflict precedence\n   • Put both workspace-level and repo-level configs for one repo.\n   • Verify workspace config wins; a warning should appear and the tree reflects workspace settings.\n\n5. Dynamic workspace update\n   • Add and remove folders while VSCode is running.  Confirm repo nodes are added/removed and inherit the correct tasks instantly.\n\n6. UI regression\n   • Snapshot test the tree provider to guarantee deterministic ordering and hierarchy.\n\n7. Manual smoke tests on Windows/macOS/Linux for path handling, workspace detection, and tree rendering (light/dark themes, accessibility, collapsible states).",
+        "dependencies": [],
+        "status": "pending",
         "subtasks": [
           {
             "id": 1,
-            "title": "Refactor Task Tree provider to support repository-level root nodes in workspace mode",
-            "status": "pending"
+            "title": "Design WorkspaceContext Interface",
+            "description": "Define the WorkspaceContext interface to encapsulate workspace type detection ('single-folder', 'multi-root', 'empty'), folder enumeration, and .code-workspace file detection.",
+            "dependencies": [],
+            "details": "Specify TypeScript types and structure for the WorkspaceContext interface, ensuring it supports all required properties and methods for workspace identification and context provision.",
+            "status": "pending",
+            "testStrategy": "Write TypeScript unit tests to validate type detection logic and ensure correct interface structure."
           },
           {
             "id": 2,
-            "title": "Implement task aggregation logic per repository and wire Current/Next views under each repo node",
-            "status": "pending"
+            "title": "Implement WorkspaceDetectionService Core Logic",
+            "description": "Develop the WorkspaceDetectionService class with methods to detect workspace type, enumerate folders, and identify .code-workspace files using VS Code API 1.74+.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement detection logic for single-folder, multi-root, and empty workspaces, leveraging VS Code's workspace API and handling virtual file systems.",
+            "status": "pending",
+            "testStrategy": "Create unit tests to verify correct detection of workspace types and folder enumeration in various scenarios."
           },
           {
             "id": 3,
-            "title": "Update context detector to notify tree provider when switching between single-folder and workspace modes",
-            "status": "pending"
+            "title": "Integrate Real-Time Workspace Monitoring",
+            "description": "Add real-time monitoring to WorkspaceDetectionService using vscode.workspace.onDidChangeWorkspaceFolders to detect and respond to dynamic changes.",
+            "dependencies": [
+              2
+            ],
+            "details": "Ensure the service updates workspace context and emits events when folders are added or removed, supporting live updates.",
+            "status": "pending",
+            "testStrategy": "Simulate folder add/remove events and assert that the service updates context and notifies listeners appropriately."
           },
           {
             "id": 4,
-            "title": "Add unit & integration tests for new tree hierarchy and dynamic workspace changes",
-            "status": "pending"
+            "title": "Handle Edge Cases and Virtual File Systems",
+            "description": "Enhance detection logic to robustly handle edge cases such as empty workspaces and workspaces using virtual file systems.",
+            "dependencies": [
+              3
+            ],
+            "details": "Test and refine logic for scenarios where no folders are present or when folders are provided by non-standard file system providers.",
+            "status": "pending",
+            "testStrategy": "Write integration tests covering empty workspaces and virtual file system scenarios to ensure correct behavior."
           },
           {
             "id": 5,
-            "title": "Update documentation and screenshots to illustrate repository-level tree structure and configuration precedence",
-            "status": "pending"
+            "title": "Ensure Type Safety and Strict Mode Compliance",
+            "description": "Refactor and validate all code to comply with TypeScript 5.0+ strict mode, ensuring type safety throughout the WorkspaceDetectionService implementation.",
+            "dependencies": [
+              4
+            ],
+            "details": "Enable strict mode in tsconfig, resolve type errors, and enforce type-safe patterns across all interfaces and classes.",
+            "status": "pending",
+            "testStrategy": "Run TypeScript compiler with strict mode enabled and add type-focused tests to catch regressions."
           }
         ]
       },
       {
         "id": 22,
-        "title": "Implement Subtask Management CLI Commands",
-        "description": "Develop CLI commands to manage subtasks, including adding, converting, removing, and clearing subtasks, with optional support for operating within a VS Code workspace file.",
-        "status": "pending",
-        "dependencies": [
-          11,
-          18
-        ],
+        "title": "Implement Configuration Hierarchy Service",
+        "description": "Build a configuration resolution system with proper precedence handling for workspace-level, repository-level, and default configurations",
+        "details": "Create ConfigurationResolver class implementing hierarchical config resolution: workspace-level (.code-workspace directory) > repository-level (individual .taskmaster directories) > extension defaults. Use vscode.workspace.getConfiguration() for workspace settings and fs.readFileSync for .taskmaster config files. Implement JSON schema validation using ajv@8.12.0 for config validation. Add file watchers using vscode.workspace.createFileSystemWatcher for dynamic config updates. Support both JSON and YAML config formats using js-yaml@4.1.0. Implement config merging with lodash.merge@4.6.2 for deep object merging.",
+        "testStrategy": "Unit tests for config precedence rules, integration tests for file watching, test config validation with invalid JSON/YAML, verify dynamic config reloading",
         "priority": "high",
-        "details": "Implement the following CLI commands for subtask management. Each command now accepts an optional `--workspace=<path/to/workspace.code-workspace>` parameter that, when supplied, limits all operations to tasks contained in the specified VS Code workspace file. When omitted, the commands operate on the current/default workspace as previously defined.\n\n1. `add-subtask --parent=<id> --title=\"<title>\" [--description=\"<desc>\"] [--workspace=<file>]`: Add a new subtask to a specified parent task within the chosen workspace.\n\n2. `add-subtask --parent=<id> --task-id=<id> [--workspace=<file>]`: Convert an existing task into a subtask of a specified parent task. Works across workspaces; if the parent and child belong to different workspaces, raise a validation error unless an explicit `--force-cross-workspace` flag (to be considered in later iterations) is added.\n\n3. `remove-subtask --id=<parentId.subtaskId> [--convert] [--workspace=<file>]`: Remove a subtask from a parent task. If `--convert` is used, convert the subtask into a standalone task (still within the same workspace unless overridden).\n\n4. `clear-subtasks --id=<id> [--workspace=<file>]`: Remove all subtasks from a specified task within the chosen workspace.\n\n5. `clear-subtasks --all [--workspace=<file>]`: Remove all subtasks from all tasks. If `--workspace` is provided, restrict the operation to that workspace; otherwise it applies globally across workspaces.\n\nEnsure that:\n• The task management system persists workspace information on every update.\n• Appropriate errors are shown for invalid or missing workspace files, or when attempting to manipulate tasks across different workspaces without permission.\n• Legacy behaviour (no `--workspace`) remains backward-compatible.\n\nEdge cases to consider include non-existent parent tasks, converting an already-subtask task, and referencing workspace files that cannot be located or parsed.",
-        "testStrategy": "1. Test `add-subtask` with and without the `--workspace` flag; verify the subtask appears in the correct workspace hierarchy.\n2. Convert an existing task into a subtask within the same workspace and across different workspaces; confirm correct validation behaviour.\n3. Validate `remove-subtask` with and without `--convert`, ensuring the target workspace file is updated appropriately.\n4. Use `clear-subtasks --id=<id>` on a task in a workspace file and verify all subtasks are removed only from that workspace.\n5. Execute `clear-subtasks --all --workspace=<file>` and confirm subtasks are removed exclusively from the specified workspace; run again without `--workspace` and confirm removal across all workspaces.\n6. Test invalid workspace paths or corrupted `.code-workspace` files and verify informative error messages are displayed.\n7. Regression tests: run original commands without the new flag to ensure backward compatibility and unchanged behaviour in the default workspace.",
+        "dependencies": [
+          21
+        ],
+        "status": "pending",
         "subtasks": [
           {
             "id": 1,
-            "title": "Design CLI Command Specifications",
-            "description": "Define the syntax, required parameters, optional flags (including `--workspace`), and expected outputs for each subtask management command.",
+            "title": "Design Configuration Hierarchy and Precedence Logic",
+            "description": "Define the rules and structure for resolving configuration values from workspace-level, repository-level, and default sources, ensuring correct precedence and merging behavior.",
             "dependencies": [],
-            "details": "Update and finalise specifications for `add-subtask`, `remove-subtask`, and `clear-subtasks`, incorporating the new optional `--workspace` parameter and documenting its behaviour, defaults, and limitations.",
+            "details": "Specify how the ConfigurationResolver will prioritize settings: workspace-level (.code-workspace directory) overrides repository-level (.taskmaster directories), which in turn override extension defaults. Document the expected merging and override rules.",
             "status": "pending",
-            "testStrategy": "Develop unit tests that validate the correctness of command specifications—ensuring the parser accepts valid combinations of parameters (with/without `--workspace`) and rejects invalid ones."
+            "testStrategy": "Create test cases with overlapping settings in different levels and verify the resolved configuration matches the defined precedence."
           },
           {
             "id": 2,
-            "title": "Implement Command Parsing and Validation",
-            "description": "Develop the logic to parse user input and validate command parameters for the subtask management commands.",
+            "title": "Implement Configuration File Loading and Parsing",
+            "description": "Develop logic to load and parse configuration files from the workspace and repository levels, supporting both JSON and YAML formats.",
             "dependencies": [
               1
             ],
-            "details": "Enhance input parsing mechanisms to recognise the `--workspace` flag. Validate that provided workspace paths exist and point to readable `.code-workspace` files.",
+            "details": "Use fs.readFileSync to read .taskmaster config files and js-yaml@4.1.0 to parse YAML files. Ensure robust error handling for invalid or missing files.",
             "status": "pending",
-            "testStrategy": "Create test cases verifying that parsing correctly interprets user input and that validation mechanisms catch invalid parameters or workspace paths."
+            "testStrategy": "Test with valid and invalid JSON/YAML files, and confirm correct parsing and error reporting."
           },
           {
             "id": 3,
-            "title": "Integrate Commands with Task Management System",
-            "description": "Connect the parsed and validated commands to the underlying task management system to perform the desired operations.",
+            "title": "Integrate Workspace Settings Retrieval",
+            "description": "Retrieve workspace-level configuration using vscode.workspace.getConfiguration() and integrate it into the resolution process.",
             "dependencies": [
-              2
+              1
             ],
-            "details": "Modify data-access layers so that task CRUD operations respect the selected workspace context, persisting changes in the correct workspace file or database namespace.",
+            "details": "Access VS Code workspace settings and ensure they are included in the configuration hierarchy with the highest precedence.",
             "status": "pending",
-            "testStrategy": "Conduct integration tests showing that commands correctly modify task/subtask data in the designated workspace and handle edge cases."
+            "testStrategy": "Mock workspace settings and verify they override repository and default configurations as expected."
           },
           {
             "id": 4,
-            "title": "Implement User Feedback and Error Handling",
-            "description": "Provide clear feedback to users upon command execution and handle errors gracefully.",
+            "title": "Implement Configuration Validation and Merging",
+            "description": "Validate loaded configurations against a JSON schema using ajv@8.12.0 and merge them using lodash.merge@4.6.2.",
             "dependencies": [
+              2,
               3
             ],
-            "details": "Update success and error messages to include workspace context where relevant (e.g., \"Subtask added to task 42 in workspace myproj.code-workspace\").",
+            "details": "Apply schema validation to each configuration source before merging. Use lodash.merge for deep merging, ensuring correct override behavior.",
             "status": "pending",
-            "testStrategy": "Simulate various scenarios—including missing workspace, invalid path, and cross-workspace conflicts—and verify that feedback is accurate and helpful."
+            "testStrategy": "Provide sample configurations with schema violations and nested objects to test validation errors and merging correctness."
           },
           {
             "id": 5,
-            "title": "Develop Comprehensive Documentation",
-            "description": "Create detailed documentation for each subtask management command, including usage examples and troubleshooting tips.",
+            "title": "Add Dynamic Configuration Updates with File Watchers",
+            "description": "Implement file watchers using vscode.workspace.createFileSystemWatcher to detect and respond to configuration file changes in real time.",
             "dependencies": [
               4
             ],
-            "details": "Document the new `--workspace` option, provide examples for single and multi-workspace usage, and outline best practices for managing subtasks across workspaces.",
+            "details": "Set up watchers for both workspace and repository config files. On change, reload and re-validate configurations, and update the resolved configuration accordingly.",
             "status": "pending",
-            "testStrategy": "Review documentation for accuracy and clarity, and gather user feedback to identify areas for improvement."
+            "testStrategy": "Modify configuration files during runtime and verify that updates are detected, validated, merged, and applied without restarting the extension."
           }
         ]
       },
       {
         "id": 23,
-        "title": "Standardize VSCode Notifications with Loading Indicators",
-        "description": "Enhance VSCode notifications to include standardized loading indicators for long-running tasks such as updating and expanding.",
-        "details": "To implement standardized VSCode notifications with loading indicators, first identify all long-running tasks within the extension that currently trigger notifications. Modify these notifications to include a loading indicator using VSCode's `window.withProgress` API. This API allows for the display of a progress indicator in the VSCode UI, which can be either a progress bar or a spinner. Ensure that the loading indicator is displayed at the start of the task and is updated or completed once the task finishes. Additionally, ensure that all notifications follow a consistent format, including a clear title, message, and optional actions. Consider edge cases where tasks may fail or be cancelled, and ensure the loading indicator reflects these states appropriately.",
-        "testStrategy": "1. Identify all long-running tasks that trigger notifications and verify that each now includes a loading indicator using the `window.withProgress` API. 2. Simulate long-running tasks and observe the loading indicator's behavior, ensuring it starts, updates, and completes correctly. 3. Test scenarios where tasks fail or are cancelled to ensure the loading indicator reflects these states accurately. 4. Verify that all notifications follow a consistent format with clear titles and messages.",
-        "status": "pending",
+        "title": "Refactor Task Tree Provider for Repository Grouping",
+        "description": "Update TaskTreeProvider to support repository-level grouping in multi-root workspaces while maintaining backward compatibility",
+        "details": "Extend TaskTreeProvider to create RepositoryTreeItem nodes for multi-root workspaces. Implement conditional rendering: repository nodes only appear in multi-root scenarios. Create TaskContext class to manage per-repository task state (current, next, all tasks). Use vscode.TreeItem with collapsibleState for repository nodes. Implement lazy loading for performance with many repositories. Add repository icons using VS Code's built-in codicons. Maintain tree state persistence using VS Code's memento API. Use Map<string, TaskContext> for efficient repository lookup. Implement tree refresh optimization to only update changed repositories.",
+        "testStrategy": "Unit tests for tree structure generation, integration tests for single vs multi-root rendering, performance tests with 10+ repositories, test tree state persistence across VS Code restarts",
+        "priority": "high",
         "dependencies": [
           21,
           22
         ],
-        "priority": "low",
+        "status": "pending",
         "subtasks": [
           {
             "id": 1,
-            "title": "Identify Long-Running Tasks Triggering Notifications",
-            "description": "Review the extension's codebase to pinpoint all long-running tasks that currently trigger notifications, such as updating and expanding operations.",
+            "title": "Extend TaskTreeProvider for Repository Nodes",
+            "description": "Update TaskTreeProvider to create RepositoryTreeItem nodes for multi-root workspaces.",
             "dependencies": [],
-            "details": "Examine the extension's source code to locate functions or processes that initiate notifications for tasks expected to take a significant amount of time. Document these tasks for further modification.",
+            "details": "Implement conditional rendering to display repository nodes only in multi-root scenarios.",
             "status": "pending",
-            "testStrategy": "Verify that all identified tasks are correctly listed and that no long-running task triggering a notification is overlooked."
+            "testStrategy": "Unit testing with mock data"
           },
           {
             "id": 2,
-            "title": "Implement Loading Indicators Using `window.withProgress` API",
-            "description": "Modify the identified notifications to include loading indicators by utilizing VSCode's `window.withProgress` API.",
+            "title": "Implement TaskContext Class",
+            "description": "Create TaskContext class to manage per-repository task state.",
             "dependencies": [
               1
             ],
-            "details": "For each long-running task identified, refactor the notification code to use the `window.withProgress` API. This API allows displaying a progress indicator, such as a spinner or progress bar, in the VSCode UI. Ensure the loading indicator starts at the beginning of the task and updates or completes upon task completion. Handle scenarios where tasks may fail or be canceled, updating the loading indicator accordingly.",
+            "details": "Use TaskContext to track current, next, and all tasks per repository.",
             "status": "pending",
-            "testStrategy": "For each modified notification, initiate the corresponding long-running task and confirm that the loading indicator appears at the start, updates appropriately during the task, and disappears upon completion. Test failure and cancellation scenarios to ensure the loading indicator reflects these states correctly."
+            "testStrategy": "Integration testing with real repository data"
           },
           {
             "id": 3,
-            "title": "Standardize Notification Format",
-            "description": "Ensure all notifications follow a consistent format, including a clear title, message, and optional actions.",
+            "title": "Implement Lazy Loading and Collapsible Repository Nodes",
+            "description": "Use vscode.TreeItem with collapsibleState for repository nodes and implement lazy loading.",
             "dependencies": [
               2
             ],
-            "details": "Review and update all notifications to adhere to a standardized format. Each notification should have a clear and concise title, an informative message, and, if applicable, actions that the user can take. This standardization enhances user experience and maintains consistency across the extension.",
+            "details": "Optimize performance by loading repository nodes on demand.",
             "status": "pending",
-            "testStrategy": "Trigger each notification and verify that it displays with the standardized title, message, and any applicable actions. Ensure that the format is consistent across all notifications within the extension."
+            "testStrategy": "Performance testing with large repository sets"
+          },
+          {
+            "id": 4,
+            "title": "Add Repository Icons and Tree State Persistence",
+            "description": "Add repository icons using VS Code's built-in codicons and maintain tree state persistence.",
+            "dependencies": [
+              3
+            ],
+            "details": "Use VS Code's memento API for tree state persistence.",
+            "status": "pending",
+            "testStrategy": "UI testing for icon display and state persistence"
+          },
+          {
+            "id": 5,
+            "title": "Implement Tree Refresh Optimization",
+            "description": "Optimize tree refresh to only update changed repositories.",
+            "dependencies": [
+              4
+            ],
+            "details": "Use Map<string, TaskContext> for efficient repository lookup during refresh.",
+            "status": "pending",
+            "testStrategy": "Regression testing for backward compatibility"
+          }
+        ]
+      },
+      {
+        "id": 24,
+        "title": "Update Service Layer for Multi-Workspace Support",
+        "description": "Refactor all existing services to eliminate deprecated API usage and support multiple workspace folders",
+        "details": "Update TagService, CLIService, TaskCacheService, TaskOperationsService, ConfigService, and FileWatcherService to iterate through all workspace folders instead of using workspaceFolders[0]. Replace all instances of deprecated vscode.workspace.rootPath with vscode.workspace.workspaceFolders. Implement per-repository task file management using path.join(folder.uri.fsPath, '.taskmaster'). Add error handling for folders without .taskmaster directories. Use Promise.allSettled() for concurrent operations across repositories. Implement repository context passing through service method parameters. Add logging using VS Code's output channel for debugging multi-workspace operations.",
+        "testStrategy": "Unit tests for each service with multiple workspace folders, integration tests for cross-service operations, test error handling for missing .taskmaster directories, verify no deprecated API usage with static analysis",
+        "priority": "high",
+        "dependencies": [
+          21,
+          22
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Refactor Services to Iterate Over All Workspace Folders",
+            "description": "Update TagService, CLIService, TaskCacheService, TaskOperationsService, ConfigService, and FileWatcherService to iterate through all workspace folders instead of using workspaceFolders.",
+            "dependencies": [],
+            "details": "Replace all logic that assumes a single workspace folder with iteration over vscode.workspace.workspaceFolders, ensuring each service operates on every folder in the workspace.",
+            "status": "pending",
+            "testStrategy": "Verify that each service processes all workspace folders by running integration tests with multiple folders open and confirming correct behavior in each."
+          },
+          {
+            "id": 2,
+            "title": "Replace Deprecated API Usage",
+            "description": "Replace all instances of vscode.workspace.rootPath with vscode.workspace.workspaceFolders and update related code to use the new API.",
+            "dependencies": [
+              1
+            ],
+            "details": "Search for all usages of the deprecated rootPath API and refactor them to use workspaceFolders, ensuring compatibility with the latest VS Code API.",
+            "status": "pending",
+            "testStrategy": "Run automated tests and manual checks to confirm that no deprecated API calls remain and that workspace folder detection works as expected."
+          },
+          {
+            "id": 3,
+            "title": "Implement Per-Repository Task File Management",
+            "description": "Update services to manage task files per repository using path.join(folder.uri.fsPath, '.taskmaster') and add error handling for missing directories.",
+            "dependencies": [
+              2
+            ],
+            "details": "Ensure each workspace folder has its own .taskmaster directory, handle cases where the directory is missing, and provide appropriate error messages or fallback behavior.",
+            "status": "pending",
+            "testStrategy": "Test with workspaces containing and lacking .taskmaster directories, verifying correct error handling and file management in each scenario."
+          },
+          {
+            "id": 4,
+            "title": "Enable Concurrent Operations and Repository Context Passing",
+            "description": "Refactor service methods to accept repository context parameters and use Promise.allSettled() for concurrent operations across repositories.",
+            "dependencies": [
+              3
+            ],
+            "details": "Modify method signatures to include repository context, and update internal logic to perform operations concurrently using Promise.allSettled() for efficiency and robustness.",
+            "status": "pending",
+            "testStrategy": "Write unit and integration tests to confirm that concurrent operations are handled correctly and that repository context is passed and utilized as intended."
+          },
+          {
+            "id": 5,
+            "title": "Add Logging for Multi-Workspace Operations",
+            "description": "Implement logging using VS Code's output channel to aid debugging and monitoring of multi-workspace operations.",
+            "dependencies": [
+              4
+            ],
+            "details": "Integrate logging statements throughout the refactored services to capture key events, errors, and operation results, using the VS Code output channel.",
+            "status": "pending",
+            "testStrategy": "Manually review logs during multi-workspace operations to ensure relevant information is captured and errors are clearly reported."
+          }
+        ]
+      },
+      {
+        "id": 25,
+        "title": "Enhance Command System and File Watching",
+        "description": "Update command system to work with repository context and implement comprehensive file watching across all workspace folders",
+        "details": "Add new commands: taskMaster.selectRepository, taskMaster.refreshRepository, taskMaster.openRepositorySettings. Update existing commands to accept repository context parameter. Implement repository selection QuickPick UI for multi-root scenarios using vscode.window.showQuickPick. Create WorkspaceFileWatcher class managing Map<string, vscode.FileSystemWatcher> for per-folder watchers. Use glob patterns '**/.taskmaster/**' for efficient file watching. Implement watcher cleanup on folder removal and extension deactivation. Add command palette integration with repository names. Use vscode.commands.registerCommand with proper disposal tracking.",
+        "testStrategy": "Unit tests for command registration and repository context handling, integration tests for file watcher management, test command execution in both single and multi-root scenarios, verify proper cleanup on extension deactivation",
+        "priority": "medium",
+        "dependencies": [
+          21,
+          22,
+          23,
+          24
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Add New Repository Commands",
+            "description": "Implement the new commands: taskMaster.selectRepository, taskMaster.refreshRepository, and taskMaster.openRepositorySettings.",
+            "dependencies": [],
+            "details": "Define and register the new commands using vscode.commands.registerCommand. Ensure each command is properly integrated with the command palette and supports disposal tracking.",
+            "status": "pending",
+            "testStrategy": "Verify that each new command appears in the command palette and executes the intended functionality for different repository contexts."
+          },
+          {
+            "id": 2,
+            "title": "Update Existing Commands for Repository Context",
+            "description": "Modify existing commands to accept and utilize a repository context parameter.",
+            "dependencies": [
+              1
+            ],
+            "details": "Refactor command handlers to accept a repository context argument. Ensure backward compatibility and update command registrations as needed.",
+            "status": "pending",
+            "testStrategy": "Test all updated commands with and without repository context to confirm correct behavior and no regressions."
+          },
+          {
+            "id": 3,
+            "title": "Implement Repository Selection QuickPick UI",
+            "description": "Create a QuickPick UI for selecting repositories in multi-root workspace scenarios using vscode.window.showQuickPick.",
+            "dependencies": [
+              1
+            ],
+            "details": "Develop a UI component that lists available repositories and returns the user's selection. Integrate this UI with relevant commands requiring repository selection.",
+            "status": "pending",
+            "testStrategy": "Simulate multi-root workspaces and verify that the QuickPick UI displays all repositories and returns the correct selection."
+          },
+          {
+            "id": 4,
+            "title": "Develop WorkspaceFileWatcher Class for Per-Folder Watching",
+            "description": "Create a WorkspaceFileWatcher class that manages a Map<string, vscode.FileSystemWatcher> for efficient per-folder file watching.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Implement file watching using glob patterns '**/.taskmaster/**' for each workspace folder. Ensure watchers are created, managed, and cleaned up appropriately.",
+            "status": "pending",
+            "testStrategy": "Add, modify, and remove files in .taskmaster folders across multiple workspace folders and verify watcher events are triggered and cleaned up as expected."
+          },
+          {
+            "id": 5,
+            "title": "Integrate Watcher Cleanup and Command Palette Enhancements",
+            "description": "Implement watcher cleanup on folder removal and extension deactivation. Enhance command palette integration to display repository names.",
+            "dependencies": [
+              4
+            ],
+            "details": "Ensure all file watchers are disposed of when folders are removed or the extension is deactivated. Update command palette entries to include repository names for clarity.",
+            "status": "pending",
+            "testStrategy": "Remove workspace folders and deactivate the extension to confirm watcher cleanup. Check command palette for correct repository name display."
+          }
+        ]
+      },
+      {
+        "id": 26,
+        "title": "Implement Core Subtask Creation Commands",
+        "description": "Implement the add-subtask command functionality including manual subtask creation and task-to-subtask conversion with comprehensive input validation and UI workflows.",
+        "details": "Create new file `src/commands/subtaskCommands.ts` with command handlers. Implement `addSubtask()` and `convertTaskToSubtask()` methods in `TaskOperationsService`. Add multi-step input workflow using `vscode.window.showInputBox()` and `vscode.window.showQuickPick()` for title, description, and dependency selection. Integrate with CLI service using `add-subtask` and `add-subtask --task-id` commands. Update `package.json` with new command definitions: `taskMaster.addSubtask` and `taskMaster.addSubtaskFromTask`. Add context menu items to task nodes in tree view. Implement input validation to ensure parent task exists and is not itself a subtask. Use VS Code's built-in progress indicators for long-running operations. Follow existing error handling patterns with `vscode.window.showErrorMessage()` for user feedback.",
+        "testStrategy": "Unit tests for command handlers with mocked CLI responses. Integration tests for complete workflow from command invocation to tree view refresh. Test input validation edge cases including invalid parent tasks, circular dependencies, and empty inputs. Manual testing of multi-step input flows and context menu integration.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define and Register Subtask Commands in VS Code",
+            "description": "Create new command definitions for 'add-subtask' and 'add-subtask --task-id' in package.json and register their handlers in src/commands/subtaskCommands.ts using VS Code's command API.",
+            "dependencies": [],
+            "details": "Ensure commands are properly registered and appear in the command palette and context menus. Use vscode.commands.registerCommand and update contributes.commands in package.json.",
+            "status": "pending",
+            "testStrategy": "Verify commands appear in the command palette and context menus, and that handlers are invoked when triggered."
+          },
+          {
+            "id": 2,
+            "title": "Implement addSubtask and convertTaskToSubtask Methods",
+            "description": "Develop addSubtask() and convertTaskToSubtask() methods in TaskOperationsService to handle manual subtask creation and task-to-subtask conversion logic.",
+            "dependencies": [
+              1
+            ],
+            "details": "Ensure methods support all required input parameters, handle task relationships, and update the data model accordingly.",
+            "status": "pending",
+            "testStrategy": "Unit test both methods for correct subtask creation, conversion, and error handling."
+          },
+          {
+            "id": 3,
+            "title": "Design Multi-Step Input Workflow for Subtask Creation",
+            "description": "Implement a multi-step input process using vscode.window.showInputBox and showQuickPick for collecting subtask title, description, and dependencies.",
+            "dependencies": [
+              2
+            ],
+            "details": "Guide users through each input step, validate entries, and allow cancellation at any stage.",
+            "status": "pending",
+            "testStrategy": "Test the workflow for correct input collection, validation, and user experience, including edge cases and cancellations."
+          },
+          {
+            "id": 4,
+            "title": "Integrate CLI and UI Workflows with Input Validation and Progress Indicators",
+            "description": "Connect the command handlers to both CLI and UI workflows, ensuring comprehensive input validation, parent task checks, and use of VS Code's progress indicators for long-running operations.",
+            "dependencies": [
+              3
+            ],
+            "details": "Validate that parent tasks exist and are not themselves subtasks. Use vscode.window.withProgress for feedback during operations.",
+            "status": "pending",
+            "testStrategy": "Test CLI and UI flows for correct validation, error handling, and progress display."
+          },
+          {
+            "id": 5,
+            "title": "Implement Error Handling and User Feedback Mechanisms",
+            "description": "Follow existing error handling patterns using vscode.window.showErrorMessage for user feedback and ensure all failure scenarios are gracefully managed.",
+            "dependencies": [
+              4
+            ],
+            "details": "Handle all possible errors, such as invalid input, missing parent tasks, or failed operations, and provide clear messages to the user.",
+            "status": "pending",
+            "testStrategy": "Simulate error scenarios and verify that appropriate error messages are shown and the extension remains stable."
+          }
+        ]
+      },
+      {
+        "id": 27,
+        "title": "Implement Subtask Removal and Conversion Features",
+        "description": "Extend existing subtask removal functionality to support conversion to standalone tasks and implement clear all subtasks functionality with bulk operations support.",
+        "details": "Enhance existing `removeSubtask()` method in `TaskOperationsService` to support `--convert` flag. Create `clearSubtasks()` method for bulk subtask removal. Modify subtask context menu to show options: 'Delete Subtask' and 'Convert to Standalone Task'. Implement confirmation dialogs using `vscode.window.showWarningMessage()` with custom buttons. Add 'Clear All Subtasks' command with subtask count display in confirmation. Support multi-select operations for bulk clearing. Integrate with CLI commands `remove-subtask --convert` and `clear-subtasks`. Update command registration in `package.json` for `taskMaster.convertSubtaskToTask` and `taskMaster.clearSubtasks`. Preserve subtask data during conversion including dependencies and metadata. Handle dependency relationship updates when converting subtasks to tasks.",
+        "testStrategy": "Test both deletion and conversion modes of subtask removal. Verify data preservation during conversion operations. Test bulk clear operations with various subtask counts. Validate confirmation dialogs and user choice handling. Test dependency relationship updates during conversions.",
+        "priority": "high",
+        "dependencies": [
+          26
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Enhance removeSubtask() to Support Conversion",
+            "description": "Update the existing removeSubtask() method in TaskOperationsService to support a --convert flag, enabling conversion of a subtask into a standalone task while preserving dependencies and metadata.",
+            "dependencies": [],
+            "details": "Implement logic to handle the --convert flag, ensuring all subtask data, dependencies, and metadata are retained and correctly updated during conversion.",
+            "status": "pending",
+            "testStrategy": "Unit test removeSubtask() with and without the --convert flag, verifying correct conversion and data preservation."
+          },
+          {
+            "id": 2,
+            "title": "Implement clearSubtasks() for Bulk Removal",
+            "description": "Create a clearSubtasks() method in TaskOperationsService to support bulk removal of all subtasks, including multi-select operations.",
+            "dependencies": [],
+            "details": "Design the method to efficiently remove multiple subtasks at once, supporting both single and multi-select scenarios.",
+            "status": "pending",
+            "testStrategy": "Test clearSubtasks() with varying numbers of subtasks, ensuring all are removed as expected and edge cases are handled."
+          },
+          {
+            "id": 3,
+            "title": "Update Subtask Context Menu and Confirmation Dialogs",
+            "description": "Modify the subtask context menu to include 'Delete Subtask' and 'Convert to Standalone Task' options, and implement confirmation dialogs using vscode.window.showWarningMessage() with custom buttons.",
+            "dependencies": [
+              1
+            ],
+            "details": "Ensure the context menu reflects new options and that confirmation dialogs display appropriate messages and buttons for each action.",
+            "status": "pending",
+            "testStrategy": "Verify menu options appear correctly and dialogs function as intended, including correct button actions."
+          },
+          {
+            "id": 4,
+            "title": "Add 'Clear All Subtasks' Command with Count Display",
+            "description": "Implement a 'Clear All Subtasks' command that displays the number of subtasks to be removed in the confirmation dialog and supports CLI integration.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Integrate with CLI commands remove-subtask --convert and clear-subtasks, and update package.json for command registration.",
+            "status": "pending",
+            "testStrategy": "Test the command in both UI and CLI, confirming correct subtask count display and successful bulk removal."
+          },
+          {
+            "id": 5,
+            "title": "Handle Dependency Updates and Data Integrity",
+            "description": "Ensure that when converting subtasks to standalone tasks, all dependency relationships and metadata are updated to maintain data integrity.",
+            "dependencies": [
+              1,
+              4
+            ],
+            "details": "Implement logic to update dependencies and verify that no orphaned or broken links remain after conversion or removal.",
+            "status": "pending",
+            "testStrategy": "Test conversion and removal scenarios, checking that dependencies and metadata are correctly updated and no data is lost."
+          }
+        ]
+      },
+      {
+        "id": 28,
+        "title": "Implement Subtask Movement and Reorganization",
+        "description": "Add subtask movement capabilities including moving between parent tasks, reordering within same parent, and converting to standalone tasks with validation to prevent circular dependencies.",
+        "details": "Implement `moveSubtask()` method in `TaskOperationsService` with support for different move scenarios. Create destination selection dialog using `vscode.window.showQuickPick()` with task list and 'Convert to Standalone Task' option. Add 'Move Subtask' to subtask context menu. Integrate with CLI `move` command with appropriate parameters. Implement circular dependency validation before allowing moves. Create preview functionality showing new position before confirming move. Add command registration for `taskMaster.moveSubtask`. Support moving subtasks between different parent tasks while preserving subtask properties. Handle reordering within same parent using position parameters. Update tree view provider to reflect changes immediately after move operations.",
+        "testStrategy": "Test moving subtasks between different parent tasks. Verify reordering within same parent works correctly. Test conversion to standalone task during move. Validate circular dependency prevention. Test preview functionality and user confirmation flows.",
+        "priority": "medium",
+        "dependencies": [
+          27
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement moveSubtask() Method with Move Scenarios",
+            "description": "Develop the moveSubtask() method in TaskOperationsService to support moving subtasks between parent tasks, reordering within the same parent, and converting subtasks to standalone tasks.",
+            "dependencies": [],
+            "details": "Ensure the method handles all move scenarios, preserves subtask properties, and supports position parameters for reordering.",
+            "status": "pending",
+            "testStrategy": "Unit test moveSubtask() for each scenario, verifying correct parent assignment, order, and standalone conversion."
+          },
+          {
+            "id": 2,
+            "title": "Create Destination Selection Dialog and Preview Functionality",
+            "description": "Design and implement a dialog using vscode.window.showQuickPick() to select the destination for moving a subtask, including a 'Convert to Standalone Task' option, and provide a preview of the new position before confirmation.",
+            "dependencies": [
+              1
+            ],
+            "details": "The dialog should list available tasks and allow users to preview the subtask's new location before finalizing the move.",
+            "status": "pending",
+            "testStrategy": "Test dialog usability, correct listing of tasks, and accurate preview rendering for all move types."
+          },
+          {
+            "id": 3,
+            "title": "Integrate Move Subtask Feature with UI and CLI",
+            "description": "Add 'Move Subtask' to the subtask context menu and integrate the move functionality with the CLI 'move' command, ensuring appropriate parameters are supported.",
+            "dependencies": [
+              2
+            ],
+            "details": "Ensure both UI and CLI trigger the same move logic and support all move scenarios.",
+            "status": "pending",
+            "testStrategy": "Test context menu and CLI command for correct invocation and parameter handling."
+          },
+          {
+            "id": 4,
+            "title": "Implement Circular Dependency Validation",
+            "description": "Develop validation logic to prevent circular dependencies before allowing subtask moves.",
+            "dependencies": [
+              1
+            ],
+            "details": "Ensure that moving a subtask does not create a cycle in the task hierarchy.",
+            "status": "pending",
+            "testStrategy": "Test with various move attempts that would and would not create cycles, confirming correct validation behavior."
+          },
+          {
+            "id": 5,
+            "title": "Update Tree View Provider and Command Registration",
+            "description": "Update the tree view provider to reflect subtask moves immediately and register the 'taskMaster.moveSubtask' command.",
+            "dependencies": [
+              3,
+              4
+            ],
+            "details": "Ensure the UI updates in real time after move operations and that the command is properly registered and accessible.",
+            "status": "pending",
+            "testStrategy": "Test tree view updates after moves and verify command registration and execution."
+          }
+        ]
+      },
+      {
+        "id": 29,
+        "title": "Implement Subtask Dependency Management",
+        "description": "Add comprehensive dependency management for subtasks including adding/removing dependencies with validation and enhanced display of dependency information in the tree view.",
+        "details": "Extend existing dependency management to support subtasks. Create `addSubtaskDependency()` and `removeSubtaskDependency()` methods in `TaskOperationsService`. Add 'Manage Dependencies' submenu to subtask context menu with 'Add Dependency' and 'Remove Dependency' options. Implement dependency selection dialogs using `vscode.window.showQuickPick()` with multi-select support. Update `TaskTreeProvider` to display dependency indicators for subtasks using VS Code icons (e.g., `$(link)`). Enhance subtask tooltips to include dependency information. Integrate with CLI dependency commands for subtasks. Implement circular dependency validation to prevent invalid dependency chains. Add command registrations for `taskMaster.addSubtaskDependency` and `taskMaster.removeSubtaskDependency`. Update tree item context values to show dependency management options only when applicable.",
+        "testStrategy": "Test adding and removing dependencies for subtasks. Verify circular dependency validation prevents invalid operations. Test dependency display in tree view and tooltips. Validate multi-select dependency selection dialogs. Test integration with CLI dependency commands.",
+        "priority": "medium",
+        "dependencies": [
+          28
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Subtask Dependency Methods in TaskOperationsService",
+            "description": "Create addSubtaskDependency() and removeSubtaskDependency() methods in TaskOperationsService to handle adding and removing dependencies for subtasks, including validation logic.",
+            "dependencies": [],
+            "details": "Extend the TaskOperationsService with robust methods for managing subtask dependencies. Ensure these methods validate input, prevent duplicates, and support integration with CLI commands.",
+            "status": "pending",
+            "testStrategy": "Unit test both methods for correct addition, removal, and validation of dependencies, including edge cases such as duplicate and invalid dependencies."
+          },
+          {
+            "id": 2,
+            "title": "Add 'Manage Dependencies' Submenu to Subtask Context Menu",
+            "description": "Integrate a 'Manage Dependencies' submenu into the subtask context menu, providing 'Add Dependency' and 'Remove Dependency' options.",
+            "dependencies": [
+              1
+            ],
+            "details": "Update the context menu for subtasks in the UI to include dependency management options, ensuring these options are only visible when applicable based on subtask state.",
+            "status": "pending",
+            "testStrategy": "Verify submenu visibility and correct triggering of dependency management commands through UI tests."
+          },
+          {
+            "id": 3,
+            "title": "Implement Dependency Selection Dialogs with Multi-Select Support",
+            "description": "Develop dialogs using vscode.window.showQuickPick() for selecting dependencies to add or remove, supporting multi-select and integrating with the new subtask dependency methods.",
+            "dependencies": [
+              2
+            ],
+            "details": "Ensure dialogs are user-friendly, prevent selection of invalid or circular dependencies, and pass selected items to the appropriate service methods.",
+            "status": "pending",
+            "testStrategy": "Test dialog behavior for various selection scenarios, including multi-select, invalid selections, and cancellation."
+          },
+          {
+            "id": 4,
+            "title": "Enhance TaskTreeProvider to Display Subtask Dependency Indicators",
+            "description": "Update TaskTreeProvider to show dependency indicators (e.g., VS Code $(link) icon) for subtasks and enhance tooltips to include dependency information.",
+            "dependencies": [
+              3
+            ],
+            "details": "Modify the tree view rendering logic to visually indicate dependencies and provide detailed dependency info in tooltips for each subtask.",
+            "status": "pending",
+            "testStrategy": "UI test the tree view to confirm correct icons and tooltip content for subtasks with and without dependencies."
+          },
+          {
+            "id": 5,
+            "title": "Integrate Circular Dependency Validation and Command Registrations",
+            "description": "Implement validation to prevent circular dependencies among subtasks and register taskMaster.addSubtaskDependency and taskMaster.removeSubtaskDependency commands.",
+            "dependencies": [
+              4
+            ],
+            "details": "Ensure that dependency chains are validated for cycles before changes are applied, and that all relevant commands are registered and functional in the extension.",
+            "status": "pending",
+            "testStrategy": "Test with various dependency graphs to confirm circular dependencies are blocked and commands are correctly registered and executed."
+          }
+        ]
+      },
+      {
+        "id": 30,
+        "title": "Integrate Command Palette and Enhance Error Handling",
+        "description": "Complete the implementation by adding all subtask commands to VS Code command palette, implementing comprehensive error handling, and ensuring robust validation across all subtask operations.",
+        "details": "Add all new subtask commands to VS Code command palette with descriptive names and logical grouping. Implement intelligent context awareness for command availability using `when` clauses. Create global command handlers that provide task/subtask selection when invoked without context. Implement comprehensive input validation for all subtask operations using TypeScript type guards and custom validation functions. Add consistent error handling patterns using `try-catch` blocks and user-friendly error messages via `vscode.window.showErrorMessage()`. Create logging system for debugging subtask operations using VS Code's output channel. Add workspace trust validation for all subtask operations. Implement graceful CLI command failure handling with fallback options. Create utility functions in `src/utils/subtaskUtils.ts` for common validation and formatting tasks. Update all command registrations in `package.json` with proper titles, categories, and icons.",
+        "testStrategy": "Test all commands through command palette with and without active selections. Verify error handling for various failure scenarios including CLI errors, invalid inputs, and workspace trust issues. Test logging functionality and error message clarity. Validate command availability based on context and workspace state.",
+        "priority": "medium",
+        "dependencies": [
+          29
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Register All Subtask Commands in Command Palette",
+            "description": "Add all new subtask commands to the VS Code command palette with descriptive names, logical grouping, and appropriate metadata in package.json.",
+            "dependencies": [],
+            "details": "Ensure each subtask command is registered in package.json with clear titles, categories, and icons. Use logical grouping for discoverability and follow VS Code's UX guidelines for command naming and organization.",
+            "status": "pending",
+            "testStrategy": "Verify that all commands appear in the Command Palette with correct names and grouping by searching for them using Ctrl+Shift+P."
+          },
+          {
+            "id": 2,
+            "title": "Implement Context Awareness and Global Command Handlers",
+            "description": "Add intelligent context awareness for command availability using 'when' clauses and create global handlers that prompt for task/subtask selection when invoked without context.",
+            "dependencies": [
+              1
+            ],
+            "details": "Utilize 'when' clauses in package.json to control command visibility based on editor state. Implement global command handlers that display a quick pick menu for selecting tasks or subtasks if no context is provided.",
+            "status": "pending",
+            "testStrategy": "Test command visibility in various contexts and ensure global handlers prompt for selection when needed."
+          },
+          {
+            "id": 3,
+            "title": "Implement Comprehensive Input Validation",
+            "description": "Add robust input validation for all subtask operations using TypeScript type guards and custom validation functions.",
+            "dependencies": [
+              2
+            ],
+            "details": "Create utility functions in src/utils/subtaskUtils.ts for common validation and formatting tasks. Ensure all user inputs and command arguments are validated before processing.",
+            "status": "pending",
+            "testStrategy": "Write unit tests for validation utilities and simulate invalid inputs to confirm proper error detection."
+          },
+          {
+            "id": 4,
+            "title": "Enhance Error Handling and User Feedback",
+            "description": "Apply consistent error handling patterns using try-catch blocks and display user-friendly error messages via vscode.window.showErrorMessage().",
+            "dependencies": [
+              3
+            ],
+            "details": "Wrap all subtask operations in try-catch blocks. On error, show clear, actionable messages to the user and log technical details for debugging.",
+            "status": "pending",
+            "testStrategy": "Force errors in subtask operations and verify that user-facing messages are clear and logs are generated."
+          },
+          {
+            "id": 5,
+            "title": "Integrate Logging, Workspace Trust, and CLI Fallbacks",
+            "description": "Create a logging system using VS Code's output channel, add workspace trust validation for all subtask operations, and implement graceful CLI command failure handling with fallback options.",
+            "dependencies": [
+              4
+            ],
+            "details": "Set up an output channel for logging subtask activity and errors. Check workspace trust before executing operations. For CLI failures, provide fallback options or informative messages.",
+            "status": "pending",
+            "testStrategy": "Test logging output, simulate untrusted workspace scenarios, and verify CLI fallback mechanisms."
+          }
+        ]
+      },
+      {
+        "id": 31,
+        "title": "Implement Core Interaction Manager and Notification Service",
+        "description": "Create the foundational InteractionManager singleton and NotificationService to standardize all alert/notification patterns across the VSCode extension, replacing 98+ scattered instances of vscode.window.show*Message() calls.",
+        "details": "Create the core interaction infrastructure:\n\n1. **InteractionManager.ts**: Implement singleton pattern with lazy initialization\n```typescript\nexport class InteractionManager {\n  private static instance: InteractionManager;\n  public readonly notify: NotificationService;\n  public readonly dialog: DialogService;\n  public readonly progress: ProgressService;\n  public readonly error: ErrorService;\n  public readonly workflow: WorkflowService;\n\n  private constructor() {\n    this.notify = new NotificationService();\n    // Initialize other services\n  }\n\n  public static getInstance(): InteractionManager {\n    if (!InteractionManager.instance) {\n      InteractionManager.instance = new InteractionManager();\n    }\n    return InteractionManager.instance;\n  }\n}\n```\n\n2. **NotificationService.ts**: Implement standardized notification patterns\n```typescript\nexport class NotificationService {\n  async success(message: string, actions?: NotificationAction[]): Promise<string | undefined> {\n    return vscode.window.showInformationMessage(message, ...actions?.map(a => a.title) || []);\n  }\n\n  async validationWarning(messageKey: string): Promise<void> {\n    const messages = {\n      'task_id_required': 'No task ID provided',\n      'subtask_selection_required': 'No subtask selected'\n    };\n    await vscode.window.showWarningMessage(messages[messageKey] || messageKey);\n  }\n\n  async taskSuccess(taskId: number, operation: string): Promise<void> {\n    await this.success(`Task ${taskId} ${operation} successfully`);\n  }\n}\n```\n\n3. **Type Definitions**: Create comprehensive TypeScript interfaces in types/ directory\n4. **Message Formatter**: Implement consistent message formatting with icon support\n5. **Migration Strategy**: Create backward-compatible wrapper functions\n\nUse VSCode Extension API 1.74+ for latest notification features. Implement proper error boundaries and fallback mechanisms.",
+        "testStrategy": "Unit tests for InteractionManager singleton behavior, NotificationService message formatting, and type safety. Integration tests for VSCode API interaction patterns. Mock vscode.window methods for isolated testing. Test notification action handling and message categorization logic.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design and Implement InteractionManager Singleton",
+            "description": "Create the InteractionManager class as a singleton with lazy initialization, ensuring it provides access to all core interaction services (NotificationService, DialogService, ProgressService, ErrorService, WorkflowService).",
+            "dependencies": [],
+            "details": "Implement the InteractionManager.ts file using the singleton pattern. Ensure that each service is initialized only once and is accessible via the singleton instance. Follow best practices for singleton implementation in TypeScript.",
+            "status": "pending",
+            "testStrategy": "Write unit tests to verify singleton behavior, service initialization, and correct instance retrieval."
+          },
+          {
+            "id": 2,
+            "title": "Develop NotificationService with Standardized Patterns",
+            "description": "Implement NotificationService to provide consistent notification and alert patterns, replacing direct calls to vscode.window.show*Message().",
+            "dependencies": [
+              1
+            ],
+            "details": "Create NotificationService.ts with methods for success, warning, error, and validation messages. Ensure all messages follow a standardized format and leverage the latest VSCode Extension API features for notifications.",
+            "status": "pending",
+            "testStrategy": "Test each notification method for correct message display, action handling, and compatibility with VSCode API 1.74+."
+          },
+          {
+            "id": 3,
+            "title": "Define Comprehensive TypeScript Interfaces",
+            "description": "Create and document all necessary TypeScript interfaces and types in the types/ directory to support interaction and notification services.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Define interfaces for notification actions, message payloads, dialog options, and other relevant types. Ensure type safety and extensibility for future interaction patterns.",
+            "status": "pending",
+            "testStrategy": "Validate type definitions through TypeScript compilation and by integrating them in service implementations."
+          },
+          {
+            "id": 4,
+            "title": "Implement Consistent Message Formatter with Icon Support",
+            "description": "Develop a message formatting utility to ensure all notifications and dialogs have a consistent style, including support for icons and dynamic content.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Create a formatter module or class that can be used by NotificationService and other services to generate messages with icons, prefixes, and standardized layouts.",
+            "status": "pending",
+            "testStrategy": "Test message formatting with various message types and icons. Verify visual consistency in the VSCode UI."
+          },
+          {
+            "id": 5,
+            "title": "Develop Migration Strategy and Backward-Compatible Wrappers",
+            "description": "Create wrapper functions and a migration plan to replace all existing vscode.window.show*Message() calls with the new InteractionManager and NotificationService.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "Identify all current usages of show*Message() in the codebase. Implement wrappers that redirect calls to the new services, ensuring backward compatibility and minimal disruption.",
+            "status": "pending",
+            "testStrategy": "Perform codebase-wide search and refactor, then run integration tests to confirm all notifications are routed through the new infrastructure without regressions."
+          }
+        ]
+      },
+      {
+        "id": 32,
+        "title": "Implement Progress and Dialog Services with CLI Integration",
+        "description": "Build ProgressService for standardized loading indicators and DialogService for unified input/confirmation patterns, with specialized CLI operation handling and timeout management.",
+        "details": "Implement progress and dialog management services:\n\n1. **ProgressService.ts**: Standardize progress indication patterns\n```typescript\nexport class ProgressService {\n  async withProgress<T>(\n    config: ProgressConfig,\n    operation: (progress: ProgressReporter) => Promise<T>\n  ): Promise<T> {\n    return vscode.window.withProgress({\n      location: config.location || vscode.ProgressLocation.Notification,\n      title: config.title,\n      cancellable: config.cancellable || false\n    }, operation);\n  }\n\n  async withCLIProgress<T>(\n    command: string,\n    operation: () => Promise<T>,\n    config?: CLIProgressConfig\n  ): Promise<T> {\n    return this.withProgress({\n      title: `Running: ${command}`,\n      location: vscode.ProgressLocation.Window,\n      cancellable: true\n    }, async (progress) => {\n      const timeout = setTimeout(() => {\n        progress.report({ message: 'This is taking longer than expected...' });\n      }, config?.warningTimeout || 5000);\n      \n      try {\n        const result = await operation();\n        clearTimeout(timeout);\n        return result;\n      } catch (error) {\n        clearTimeout(timeout);\n        throw error;\n      }\n    });\n  }\n}\n```\n\n2. **DialogService.ts**: Unified dialog patterns\n```typescript\nexport class DialogService {\n  async quickPick<T>(\n    items: QuickPickItem<T>[],\n    config?: QuickPickConfig\n  ): Promise<T | undefined> {\n    const result = await vscode.window.showQuickPick(items, {\n      placeHolder: config?.placeholder,\n      canPickMany: config?.canPickMany || false,\n      ignoreFocusOut: config?.ignoreFocusOut || false\n    });\n    return result?.value;\n  }\n\n  async confirmWarning(\n    message: string,\n    options?: { modal?: boolean }\n  ): Promise<boolean> {\n    const result = await vscode.window.showWarningMessage(\n      message,\n      { modal: options?.modal || false },\n      'Yes',\n      'No'\n    );\n    return result === 'Yes';\n  }\n\n  async taskSelector(\n    tasks: Task[],\n    config?: TaskSelectorConfig\n  ): Promise<Task | undefined> {\n    const items = tasks.map(task => ({\n      label: `#${task.id}: ${task.title}`,\n      description: task.description,\n      value: task\n    }));\n    return this.quickPick(items, config);\n  }\n}\n```\n\n3. **CLI Integration**: Replace manual timeout handling in cliService.ts with standardized progress patterns\n4. **Dialog Builder**: Implement fluent API for complex multi-step dialogs\n5. **Keyboard Navigation**: Ensure proper focus management and accessibility\n\nLeverage VSCode's latest QuickPick API features including step navigation and validation.",
+        "testStrategy": "Test progress cancellation behavior, CLI timeout handling, and dialog validation patterns. Mock long-running operations for progress testing. Verify keyboard navigation and accessibility compliance. Test dialog builder fluent API and multi-step workflows.",
+        "priority": "high",
+        "dependencies": [
+          31
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement ProgressService for Standardized Loading Indicators",
+            "description": "Develop ProgressService.ts to provide a unified API for progress indication, supporting both general and CLI-specific operations with timeout management.",
+            "dependencies": [],
+            "details": "Create methods such as withProgress and withCLIProgress to standardize progress reporting, leveraging VSCode's window.withProgress API and handling operation timeouts for CLI commands.",
+            "status": "pending",
+            "testStrategy": "Unit test withProgress and withCLIProgress for correct progress reporting, timeout handling, and error propagation using mocked VSCode APIs."
+          },
+          {
+            "id": 2,
+            "title": "Develop DialogService for Unified Input and Confirmation Patterns",
+            "description": "Build DialogService.ts to encapsulate common dialog patterns, including quick pick lists, confirmation dialogs, and task selection.",
+            "dependencies": [],
+            "details": "Implement methods like quickPick, confirmWarning, and taskSelector using VSCode's showQuickPick and showWarningMessage APIs, ensuring consistent user experience.",
+            "status": "pending",
+            "testStrategy": "Unit test dialog methods for correct option rendering, selection handling, and modal behavior using mocked VSCode APIs."
+          },
+          {
+            "id": 3,
+            "title": "Integrate ProgressService with CLI Operations",
+            "description": "Refactor cliService.ts to utilize ProgressService for all CLI-related progress and timeout handling, replacing manual implementations.",
+            "dependencies": [
+              1
+            ],
+            "details": "Update CLI operation flows to use withCLIProgress, ensuring standardized progress feedback and consistent timeout warnings for long-running commands.",
+            "status": "pending",
+            "testStrategy": "Integration test CLI operations to verify progress display, timeout messaging, and cancellation support."
+          },
+          {
+            "id": 4,
+            "title": "Implement Fluent Dialog Builder for Multi-Step Dialogs",
+            "description": "Design and implement a fluent API within DialogService to support complex, multi-step dialog flows with step navigation and validation.",
+            "dependencies": [
+              2
+            ],
+            "details": "Leverage VSCode's latest QuickPick API features to enable step-by-step dialogs, input validation, and dynamic navigation between steps.",
+            "status": "pending",
+            "testStrategy": "Unit and integration test multi-step dialog flows for correct step transitions, validation enforcement, and user input handling."
+          },
+          {
+            "id": 5,
+            "title": "Ensure Keyboard Navigation and Accessibility Compliance",
+            "description": "Enhance ProgressService and DialogService to support robust keyboard navigation and accessibility, ensuring focus management and screen reader compatibility.",
+            "dependencies": [
+              1,
+              2,
+              4
+            ],
+            "details": "Audit and update dialog and progress components to follow accessibility best practices, including focus trapping, ARIA attributes, and keyboard shortcuts.",
+            "status": "pending",
+            "testStrategy": "Manual and automated accessibility testing using screen readers and keyboard navigation tools to validate compliance."
+          }
+        ]
+      },
+      {
+        "id": 33,
+        "title": "Implement Error Handling, Workflow Services, and Complete Migration",
+        "description": "Build comprehensive ErrorService for centralized error handling with recovery suggestions, implement WorkflowService for multi-step user flows, and complete migration of all 40+ try-catch blocks and interaction patterns across the codebase.",
+        "details": "Complete the interaction system with error handling and workflows:\n\n1. **ErrorService.ts**: Centralized error management\n```typescript\nexport class ErrorService {\n  async handle(error: Error, context?: ErrorContext): Promise<void> {\n    const category = this.categorize(error);\n    const userMessage = this.formatUserMessage(error);\n    const suggestions = this.getSuggestions(error);\n    \n    if (category === ErrorCategory.CLI_ERROR) {\n      await this.handleCLIError(error as CLIError, context?.command || 'unknown');\n    } else {\n      await vscode.window.showErrorMessage(\n        userMessage,\n        ...suggestions.map(s => s.title)\n      );\n    }\n  }\n\n  categorize(error: Error): ErrorCategory {\n    if (error.message.includes('ENOENT')) return ErrorCategory.CLI_NOT_FOUND;\n    if (error.message.includes('timeout')) return ErrorCategory.TIMEOUT;\n    if (error.message.includes('permission')) return ErrorCategory.PERMISSION;\n    return ErrorCategory.UNKNOWN;\n  }\n\n  getSuggestions(error: Error): ErrorSuggestion[] {\n    const category = this.categorize(error);\n    switch (category) {\n      case ErrorCategory.CLI_NOT_FOUND:\n        return [{ title: 'Install CLI', action: 'install_cli' }];\n      case ErrorCategory.TIMEOUT:\n        return [{ title: 'Retry', action: 'retry' }, { title: 'Check Connection', action: 'check_connection' }];\n      default:\n        return [{ title: 'Report Issue', action: 'report_issue' }];\n    }\n  }\n}\n```\n\n2. **WorkflowService.ts**: Multi-step flow management\n```typescript\nexport class WorkflowService {\n  async addTaskWorkflow(): Promise<AddTaskResult | undefined> {\n    const builder = new WorkflowBuilder('add_task');\n    \n    return builder\n      .step('description', {\n        type: 'input',\n        title: 'Task Description',\n        placeholder: 'Describe what needs to be done...',\n        validate: (value) => value.length > 0 ? null : 'Description is required'\n      })\n      .step('priority', {\n        type: 'quickpick',\n        title: 'Select Priority',\n        items: [{ label: 'High', value: 'high' }, { label: 'Medium', value: 'medium' }, { label: 'Low', value: 'low' }]\n      })\n      .step('dependencies', {\n        type: 'multi_select',\n        title: 'Select Dependencies (Optional)',\n        items: await this.getAvailableTasks(),\n        optional: true\n      })\n      .onCancel(() => InteractionManager.getInstance().notify.info('Task creation cancelled'))\n      .execute();\n  }\n}\n```\n\n3. **Complete Migration**: \n   - Replace all 47+ showInformationMessage instances\n   - Replace all 26+ showErrorMessage instances  \n   - Replace all 25+ showWarningMessage instances\n   - Migrate 15+ showQuickPick instances\n   - Migrate 10+ showInputBox instances\n   - Replace 40+ try-catch blocks with centralized error handling\n\n4. **Theme Integration**: Implement consistent iconography and theme-aware styling\n5. **Testing Infrastructure**: Create comprehensive test suite with mocks and integration tests\n6. **Documentation**: Generate API documentation and migration guide\n\nUse TypeScript 4.9+ features for better type inference and error handling patterns.",
+        "testStrategy": "Test error categorization accuracy, recovery suggestion relevance, and workflow step validation. Integration tests for complete user flows from start to finish. Test migration compatibility with existing functionality. Performance testing for large task lists and complex workflows. Accessibility testing for screen readers and keyboard navigation.",
+        "priority": "medium",
+        "dependencies": [
+          32
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design and Implement Centralized ErrorService",
+            "description": "Develop a robust ErrorService for centralized error handling, categorization, user messaging, and actionable recovery suggestions. Ensure all error objects follow a standardized interface and integrate consistent error reporting and logging across the application.",
+            "dependencies": [],
+            "details": "Create custom error classes, define error categories, and implement methods for formatting user messages and generating recovery suggestions. Ensure the service supports extensibility for new error types and integrates with the application's UI for user feedback.",
+            "status": "pending",
+            "testStrategy": "Unit test error categorization, message formatting, and suggestion generation. Mock error scenarios to verify correct handling and user feedback."
+          },
+          {
+            "id": 2,
+            "title": "Develop WorkflowService for Multi-Step User Flows",
+            "description": "Implement a WorkflowService to manage complex, multi-step user interactions such as task creation, ensuring validation, cancellation, and dynamic step configuration.",
+            "dependencies": [
+              1
+            ],
+            "details": "Utilize a builder pattern to define workflows with input, quick pick, and multi-select steps. Integrate error handling at each step using ErrorService. Support extensibility for additional workflows.",
+            "status": "pending",
+            "testStrategy": "Integration test workflows with various user inputs, cancellations, and error scenarios. Validate correct step progression and error recovery."
+          },
+          {
+            "id": 3,
+            "title": "Migrate Legacy Interaction and Error Patterns",
+            "description": "Replace all legacy try-catch blocks and direct UI message calls (showInformationMessage, showErrorMessage, showWarningMessage, showQuickPick, showInputBox) with the new ErrorService and WorkflowService patterns across the codebase.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Systematically refactor 40+ try-catch blocks and 100+ UI interaction instances to use centralized services. Ensure all error and interaction flows are consistent and leverage new recovery and workflow mechanisms.",
+            "status": "pending",
+            "testStrategy": "Regression test all migrated flows. Use static analysis to confirm removal of legacy patterns. Verify error and interaction consistency in the UI."
+          },
+          {
+            "id": 4,
+            "title": "Integrate Theme-Aware Styling and Iconography",
+            "description": "Implement consistent iconography and theme-aware styling for all error messages, workflows, and user interactions to ensure a cohesive user experience.",
+            "dependencies": [
+              3
+            ],
+            "details": "Update UI components to use theme APIs and standardized icons. Ensure accessibility and visual consistency across light and dark themes.",
+            "status": "pending",
+            "testStrategy": "Visual regression testing across supported themes. Manual accessibility checks for color contrast and icon clarity."
+          },
+          {
+            "id": 5,
+            "title": "Establish Comprehensive Testing and Documentation",
+            "description": "Develop a complete test suite with mocks and integration tests for ErrorService, WorkflowService, and all migrated flows. Generate API documentation and a migration guide for future maintainers.",
+            "dependencies": [
+              4
+            ],
+            "details": "Write unit and integration tests covering all error and workflow scenarios. Use TypeScript 4.9+ features for type-safe tests. Document APIs and provide a step-by-step migration guide.",
+            "status": "pending",
+            "testStrategy": "Automated test coverage reports. Peer review of documentation. Continuous integration to ensure test reliability."
+          }
+        ]
+      },
+      {
+        "id": 34,
+        "title": "Implement Enhanced Logger Core and VS Code Configuration",
+        "description": "Build out the core logging library in src/utils/enhancedLogger.ts to support multiple log levels, structured data, context management, performance timing, and file+output channel outputs. Expose a getLogger factory that reads user settings and honors runtime changes.",
+        "details": "* Use pino@8.16.0 as the underlying engine for structured, high-performance logging.  \n* Create src/utils/enhancedLogger.ts implementing the ILogger interface from the PRD.  \n* Read configuration via vscode.workspace.getConfiguration('taskMaster.logging') using TypeScript 5.4 APIs.  \n* Support log levels TRACE, DEBUG, INFO, WARN, ERROR, FATAL.  \n* Implement time()/timeEnd() via a Map of timestamps and include duration in context.  \n* Merge context via child() method to propagate correlationId, component, operation, etc.  \n* Wire up outputs:  \n  • vscode.window.createOutputChannel('Task Master Logs') for outputChannel  \n  • console via pino.prettyPrint for local dev  \n  • optional file logging via pino.destination with rotation (use rotating-file-stream@2.x)  \n* Listen to vscode.workspace.onDidChangeConfiguration to reload config at runtime.",
+        "testStrategy": "* Write Jest 29 + ts-jest unit tests to mock pino logger and verify: proper level filtering, structured JSON output, context merging, timer start/end, hot-reload config.  \n* Validate that outputChannel append() is called for each log when enabled.  \n* Benchmark basic logging overhead <5% of operation time via a simple performance test.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design Multi-Level Structured Logging Architecture",
+            "description": "Develop a comprehensive architecture for multi-level structured logging to enhance log clarity and facilitate efficient debugging.",
+            "dependencies": [],
+            "details": "This task involves defining a hierarchical logging structure that supports various log levels (e.g., DEBUG, INFO, WARN, ERROR) and ensures consistent formatting across all levels. The design should consider the inclusion of contextual metadata to provide detailed insights into application behavior.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement Performance Timing with Child Logger Functionality",
+            "description": "Integrate performance timing mechanisms within the logging system using child loggers to monitor and log execution times of specific code segments.",
+            "dependencies": [
+              1
+            ],
+            "details": "This task requires the creation of child loggers that can be attached to specific functions or modules to measure and log their execution times. The implementation should ensure minimal performance overhead and provide precise timing data to aid in performance optimization efforts.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Develop Configurable Formatting and Output Options",
+            "description": "Create a flexible configuration system for log formatting and output destinations to accommodate various operational requirements.",
+            "dependencies": [
+              1
+            ],
+            "details": "This task involves implementing a configuration mechanism that allows users to specify log formats (e.g., JSON, plain text) and select output destinations (e.g., console, files, external log management systems). The system should support dynamic configuration changes without requiring application restarts.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Implement Asynchronous Logging with Data Sanitization and Rate Limiting",
+            "description": "Enhance the logging system with asynchronous capabilities, incorporating data sanitization and rate limiting to improve performance and security.",
+            "dependencies": [
+              1,
+              3
+            ],
+            "details": "This task entails developing an asynchronous logging mechanism that queues log messages for processing, thereby reducing the impact on application performance. Additionally, it requires implementing data sanitization to prevent sensitive information from being logged and rate limiting to control the volume of log messages, preventing potential log flooding.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Integrate Logging System with Workspace Configuration in VS Code",
+            "description": "Integrate the enhanced logging system with Visual Studio Code's workspace configuration to provide seamless logging management within the development environment.",
+            "dependencies": [
+              1,
+              3
+            ],
+            "details": "This task involves creating an extension or utilizing existing APIs to allow developers to configure and manage the logging system directly from VS Code's workspace settings. The integration should support customization of log levels, formats, and output destinations, enhancing the developer experience.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 35,
+        "title": "Integrate Logger into Core Services",
+        "description": "Instrument critical services (CLIService, TaskManagerService, ConfigService, SecurityService) with the enhanced logger. Create a centralized error-logging utility to unify error capture and reporting.",
+        "details": "* In each service constructor, import getLogger() and call .child({ component: '<ServiceName>' }).  \n* Wrap key methods with:  \n  • log.trace/debug at method entry  \n  • logger.time(operationId) before async operations  \n  • logger.timeEnd(operationId) and info on success  \n  • catch blocks that call logger.error(message, error, context) then rethrow.  \n* Build src/utils/errorHandler.ts exporting a handleError(error, context) that logs at ERROR or FATAL based on error type and provides a user-friendly message via vscode.window.showErrorMessage.  \n* Update ConfigService to log configuration changes and sanitized values, respecting workspace trust (vscode.workspace.isTrusted).",
+        "testStrategy": "* Use sinon spies in existing Mocha or Jest tests to assert that logger.child(), .info(), .error(), .time(), .timeEnd() are called with correct parameters.  \n* Cover failure paths by simulating thrown errors and verifying handleError logs and UI notifications.  \n* Add integration tests ensuring correlationId flows through chained service calls.",
+        "priority": "medium",
+        "dependencies": [
+          34
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Select a Structured Logging Library",
+            "description": "Evaluate and choose a structured logging library that aligns with the project's technology stack and performance requirements.",
+            "dependencies": [],
+            "details": "Consider factors such as performance, integration capabilities, community support, and compatibility with existing systems. For example, in Python, libraries like 'structlog' offer structured logging with support for both synchronous and asynchronous methods. [Source: https://www.highlight.io/blog/5-best-python-logging-libraries]",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Replace Console Logging with Structured Logging",
+            "description": "Systematically refactor existing console logging instances across critical services to utilize the selected structured logging library.",
+            "dependencies": [
+              1
+            ],
+            "details": "This involves updating over 120 logging instances to ensure consistency and leverage the benefits of structured logging, such as improved searchability and analysis. [Source: https://www.crowdstrike.com/en-us/cybersecurity-101/next-gen-siem/logging-best-practices/]",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement Enhanced Service-Specific Logging Features",
+            "description": "Develop and integrate additional logging features tailored to the specific needs of each critical service.",
+            "dependencies": [
+              2
+            ],
+            "details": "This may include adding contextual information, implementing correlation IDs for tracing requests across services, and ensuring logs capture relevant metadata. [Source: https://signoz.io/blog/structured-logs/]",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Establish Centralized Error Handling with Diagnostic Context",
+            "description": "Set up a centralized error handling mechanism that incorporates diagnostic context to facilitate efficient troubleshooting.",
+            "dependencies": [
+              3
+            ],
+            "details": "This involves aggregating logs from various services into a centralized system, enabling comprehensive analysis and quicker identification of issues. [Source: https://www.crowdstrike.com/en-us/cybersecurity-101/next-gen-siem/logging-best-practices/]",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Conduct Comprehensive Validation and Documentation",
+            "description": "Perform thorough testing of the new logging implementation and create detailed documentation for future reference.",
+            "dependencies": [
+              4
+            ],
+            "details": "Validation should ensure that all logging instances function correctly and meet the project's requirements. Documentation should cover the logging setup, usage guidelines, and maintenance procedures. [Source: https://www.crowdstrike.com/en-us/cybersecurity-101/next-gen-siem/logging-best-practices/]",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 36,
+        "title": "Migrate Commands and Providers to Enhanced Logging",
+        "description": "Replace all console.log/error calls in commands and the TaskTreeProvider with the new logger. Add contextual and performance logging in command execution and tree rendering.",
+        "details": "* Use ESLint rule no-console to locate and auto-fix console.* to appropriate logger methods.  \n* In each command handler:  \n  • generate correlationId and child logger with { operation: commandId, correlationId }  \n  • log .info('Starting command', { args })  \n  • call .time()/.timeEnd() around RPC or CLI execution  \n  • catch and call logger.error + throw.  \n* In TaskTreeProvider:  \n  • on tree refresh, call logger.time('tree-refresh') and log duration on end.  \n  • include node context metadata in logs.  \n* Ensure no sensitive data in logs by sanitizing file paths with path.relative or masking.  \n* Enforce structured JSON format for all new logs.",
+        "testStrategy": "* End-to-end tests via vscode-test: invoke commands and capture outputChannel logs, verify presence of structured JSON entries, correlationId consistency, and duration metrics.  \n* Static analysis CI job fails on any console.* usage.  \n* Manual smoke test in a trusted/untrusted workspace to confirm security-aware logging behavior.",
+        "priority": "medium",
+        "dependencies": [
+          35
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Comprehensive Command and Provider Logging Updates",
+            "description": "Enhance the logging system to capture detailed command and provider activities for improved traceability and debugging.",
+            "dependencies": [],
+            "details": "Update the existing logging framework to include detailed logs for all command executions and provider interactions. Ensure that logs are structured and categorized appropriately to facilitate easy analysis and troubleshooting.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Enhance Configuration Management",
+            "description": "Strengthen configuration management practices to ensure system consistency and reliability.",
+            "dependencies": [
+              1
+            ],
+            "details": "Develop and enforce configuration policies that define standard settings for all system components. Implement version control for configuration files and establish procedures for change management to prevent unauthorized modifications.",
+            "status": "pending",
+            "testStrategy": ""
           }
         ]
       }
     ],
     "metadata": {
       "created": "2025-06-17T14:01:27.651Z",
-      "updated": "2025-06-20T20:18:16.984Z",
+      "updated": "2025-06-22T06:13:31.112Z",
       "description": "Tasks for master context"
     }
   }
